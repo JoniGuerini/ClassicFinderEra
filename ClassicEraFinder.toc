@@ -1,6 +1,6 @@
-## Interface: 11508
+## Interface: 20505
 ## Title: Classic Era Finder
-## Notes: LFG/LFM a partir do chat — UI própria, sem templates Blizzard.
+## Notes: LFG/LFM a partir do chat — Classic + TBC nesta pasta (_anniversary_). UI própria, sem templates Blizzard.
 ## Version: 1.0.0
 ## Author: ClassicEraFinder
 ## SavedVariables: ClassicEraFinderDB

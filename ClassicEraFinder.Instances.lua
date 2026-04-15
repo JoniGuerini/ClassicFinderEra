@@ -1,102 +1,40 @@
--- Módulo: lógica de instâncias e formatação da coluna "Instância / níveis"
--- Mantém exatamente a mesma lógica do arquivo único, mas exposta em ClassicEraFinder.*
+-- Módulo: lógica de instâncias (detecção, formatação, filtros).
+--
+-- Dados estáticos (INSTANCE_ROWS, level range, Scarlet needles) vivem em
+-- ClassicEraFinder.InstanceData.lua. Este módulo só consome e transforma.
 
 ClassicEraFinder = ClassicEraFinder or {}
 local CEF = ClassicEraFinder
 
--- Instâncias: várias substrings por linha (busca case-insensitive, texto puro).
-local INSTANCE_ROWS = {
-  { key = "Naxxramas", needles = { "naxxramas", "naxx ", " naxx", "naxx." } },
-  { key = "Ahn'Qiraj 40", needles = { "aq40", "aq 40", "ahn'qiraj", "ahn qiraj", " temple of ahn", "cthun", "ouro", "viscidus", "huhuran", "fankriss" } },
-  { key = "Ahn'Qiraj 20", needles = { "aq20", "aq 20", "ruins of ahn", "ossirian", "moam", "rajaxx" } },
-  { key = "Zul'Gurub", needles = { " zg ", " zg.", "zg run", "zul'gurub", "zul gurub", "hakkar", "jindo" } },
-  { key = "Molten Core", needles = { "molten core", "ragnaros", "geddon", "golemagg", "magmadar", "lucifron", " mc ", " mc,", "full mc", "molten", "m mc", " gdkp mc", "mc gdkp" } },
-  { key = "Blackwing Lair", needles = { "blackwing", "bwl ", " bwl", "nefarian", "razorgore", "vael" } },
-  { key = "Onyxia", needles = { "onyxia", " ony ", " ony.", "ony run" } },
-  {
-    key = "Stratholme",
-    needles = {
-      "stratholme",
-      "strat ",
-      " strat",
-      "strat(",
-      "strat)",
-      "strat,",
-      "strat.",
-      "strat-",
-      "strat live",
-      "strat ud",
-      "rivendare",
-      "baron run",
-    },
-  },
-  { key = "Scholomance", needles = { "scholomance", "scholo", "gandling", "darkmaster" } },
-  { key = "Dire Maul", needles = { "dire maul", "dm north", "dm east", "dm west", "dm tribute", "immol'thar", "alzzin" } },
-  { key = "Blackrock Spire", needles = { "ubrs", "lbrs", "blackrock spire", "lower spire", "upper spire", "drakkisath", "rend " } },
-  { key = "Blackrock Depths", needles = { "blackrock depths", "brd ", " brd", "angerforge", "emperor ", "lokhtos", "arena run" } },
-  { key = "Sunken Temple", needles = { "sunken temple", "atal'hakkar", "atal hakkar", " jammalan", "eranikus" } },
-  { key = "Maraudon", needles = { "maraudon", " mara ", "mara run", "princess ", "rotgrip", "landslide" } },
-  { key = "Zul'Farrak", needles = { "zul'farrak", "zul farrak", "zf ", " zf", "sandfury", "chief sandscalp" } },
-  { key = "Uldaman", needles = { "uldaman", "ulda ", "/ulda", "ulda/", "archaedas", "ironaya" } },
-  -- Scarlet Monastery no Classic = 4 instâncias separadas (alas).
-  { key = "SM Graveyard", needles = { "sm gy", "sm graveyard", "sm grave" } },
-  { key = "SM Library", needles = { "sm lib", "sm librar", "sm library" } },
-  { key = "SM Armory", needles = { "sm arm", "sm armory", "sm arms" } },
-  { key = "SM Cathedral", needles = { "sm cath", "sm cathedral" } },
-  { key = "Razorfen Downs", needles = { "razorfen downs", "rfd/", " rfd/", "/rfd", "rfd ", " rfd", "amnennar" } },
-  { key = "Razorfen Kraul", needles = { "razorfen kraul", "rfk ", " rfk", "charlga" } },
-  { key = "Gnomeregan", needles = { "gnomeregan", "gnomer", "thermaplugg", "pummeler" } },
-  { key = "The Stockade", needles = { "stockade", "stocks", "stocks,", "stocks.", "stocks:", "stocks;", "stocks)", "stocks(", "stocks ", " the stocks" } },
-  { key = "Blackfathom Deeps", needles = { "blackfathom", "bfd ", " bfd", "akumai" } },
-  { key = "Shadowfang Keep", needles = { "shadowfang", "sfk ", " sfk", "arugal" } },
-  { key = "Deadmines", needles = { "deadmines", "dead mines", "van cleef", "defias", "vc ", " vc" } },
-  { key = "Wailing Caverns", needles = { "wailing caverns", "wc run", " mutanus", "cobrahn" } },
-  { key = "Ragefire Chasm", needles = { "ragefire", "rfc ", " rfc", "bazzalan" } },
-}
+local D = CEF.InstanceData
+local INSTANCE_ROWS         = D.INSTANCE_ROWS
+local INSTANCE_LEVEL_RANGE  = D.INSTANCE_LEVEL_RANGE
+local SCARLET_WING_KEYS     = D.SCARLET_WING_KEYS
+local SCARLET_GENERIC_NEEDLES = D.SCARLET_GENERIC_NEEDLES
 
--- Raids (Classic Era); o restante em INSTANCE_ROWS conta como masmorra no filtro.
-local INSTANCE_RAIDS = {
-  ["Naxxramas"] = true,
-  ["Ahn'Qiraj 40"] = true,
-  ["Ahn'Qiraj 20"] = true,
-  ["Zul'Gurub"] = true,
-  ["Molten Core"] = true,
-  ["Blackwing Lair"] = true,
-  ["Onyxia"] = true,
-}
+-- Cores vêm de CEF.Theme (fonte única). Ver ClassicEraFinder.Theme.lua.
+local Hex = (CEF.Theme and CEF.Theme.Hex) or {}
+local COLOR_LVL_ORANGE_MIN        = Hex.levelMin    or "|cffff9933"
+local COLOR_LVL_GREEN_MAX         = Hex.levelMax    or "|cff33cc33"
+local COLOR_INSTANCE_DUNGEON_NAME = Hex.dungeonName or "|cff9fd3ff"
+local COLOR_INSTANCE_RAID_NAME    = Hex.raidName    or "|cffffb74d"
+local COLOR_ERA_CLASSIC_COL       = Hex.eraClassic  or "|cffb8956b"
+local COLOR_ERA_TBC_COL           = Hex.eraTbc      or "|cff33cc33"
 
--- Faixa de níveis recomendada (Classic Era / vanilla); só para referência na UI.
-local INSTANCE_LEVEL_RANGE = {
-  ["Ragefire Chasm"] = "13-18",
-  ["Wailing Caverns"] = "17-24",
-  ["Deadmines"] = "17-26",
-  ["Shadowfang Keep"] = "22-30",
-  ["Blackfathom Deeps"] = "24-32",
-  ["The Stockade"] = "24-32",
-  ["Gnomeregan"] = "29-38",
-  ["Razorfen Kraul"] = "30-40",
-  ["SM Graveyard"] = "34-45",
-  ["SM Library"] = "34-45",
-  ["SM Armory"] = "34-45",
-  ["SM Cathedral"] = "34-45",
-  ["Razorfen Downs"] = "35-45",
-  ["Uldaman"] = "41-51",
-  ["Zul'Farrak"] = "44-54",
-  ["Maraudon"] = "46-55",
-  ["Sunken Temple"] = "50-60",
-  ["Blackrock Depths"] = "52-60",
-  ["Dire Maul"] = "56-60",
-  ["Scholomance"] = "58-60",
-  ["Stratholme"] = "58-60",
-  ["Blackrock Spire"] = "55-60",
-  ["Zul'Gurub"] = "60",
-  ["Molten Core"] = "60",
-  ["Onyxia"] = "60",
-  ["Blackwing Lair"] = "60",
-  ["Ahn'Qiraj 20"] = "60",
-  ["Ahn'Qiraj 40"] = "60",
-  ["Naxxramas"] = "60",
-}
+-- ============================================================================
+-- Índices derivados de INSTANCE_ROWS (por key).
+-- ============================================================================
+local INSTANCE_KEY_EXPANSION = {}
+local INSTANCE_KEY_IS_RAID   = {}
+for _, row in ipairs(INSTANCE_ROWS) do
+  local k = row.key
+  if not INSTANCE_KEY_EXPANSION[k] then
+    INSTANCE_KEY_EXPANSION[k] = row.expansion or "classic"
+  end
+  if row.kind == "raid" then
+    INSTANCE_KEY_IS_RAID[k] = true
+  end
+end
 
 local function instanceMinLevelForSort(instanceKey)
   local plain = INSTANCE_LEVEL_RANGE[instanceKey]
@@ -117,67 +55,82 @@ end
 -- Entradas do menu do filtro: opção (key false = todas) ou cabeçalho de secção.
 CEF.INSTANCE_FILTER_MENU_OPTS = {}
 do
-  local dungeons, raids = {}, {}
+  local classicDungeons, tbcDungeons = {}, {}
+  local classicRaids, tbcRaids = {}, {}
   local seen = {}
   for _, row in ipairs(INSTANCE_ROWS) do
     local k = row.key
     if not seen[k] then
       seen[k] = true
-      if INSTANCE_RAIDS[k] then
-        raids[#raids + 1] = k
+      local exp = row.expansion or "classic"
+      if row.kind == "raid" then
+        if exp == "tbc" then
+          tbcRaids[#tbcRaids + 1] = k
+        else
+          classicRaids[#classicRaids + 1] = k
+        end
       else
-        dungeons[#dungeons + 1] = k
+        if exp == "tbc" then
+          tbcDungeons[#tbcDungeons + 1] = k
+        else
+          classicDungeons[#classicDungeons + 1] = k
+        end
       end
     end
   end
 
-  table.sort(dungeons, function(a, b)
+  local sortKeys = function(a, b)
     local ka, kb = instanceMinLevelForSort(a), instanceMinLevelForSort(b)
     if ka ~= kb then
       return ka < kb
     end
     return strlower(a) < strlower(b)
-  end)
+  end
 
-  table.sort(raids, function(a, b)
-    local ka, kb = instanceMinLevelForSort(a), instanceMinLevelForSort(b)
-    if ka ~= kb then
-      return ka < kb
-    end
-    return strlower(a) < strlower(b)
-  end)
+  table.sort(classicDungeons, sortKeys)
+  table.sort(tbcDungeons, sortKeys)
+  table.sort(classicRaids, sortKeys)
+  table.sort(tbcRaids, sortKeys)
 
   local opts = {}
+  local L = CEF.L or {}
   opts[#opts + 1] = { kind = "opt", key = false }
-  opts[#opts + 1] = { kind = "hdr", text = "Masmorras" }
-  for _, k in ipairs(dungeons) do
+  opts[#opts + 1] = { kind = "hdr", text = L["dungeons"] or "Dungeons" }
+  for _, k in ipairs(classicDungeons) do
     opts[#opts + 1] = { kind = "opt", key = k }
   end
-  opts[#opts + 1] = { kind = "hdr", text = "Raids" }
-  for _, k in ipairs(raids) do
+  if #tbcDungeons > 0 then
+    opts[#opts + 1] = { kind = "hdr", text = L["tbcDungeons"] or "TBC — dungeons" }
+    for _, k in ipairs(tbcDungeons) do
+      opts[#opts + 1] = { kind = "opt", key = k }
+    end
+  end
+  opts[#opts + 1] = { kind = "hdr", text = L["raids"] or "Raids" }
+  for _, k in ipairs(classicRaids) do
     opts[#opts + 1] = { kind = "opt", key = k }
+  end
+  if #tbcRaids > 0 then
+    opts[#opts + 1] = { kind = "hdr", text = L["tbcRaids"] or "TBC — raids" }
+    for _, k in ipairs(tbcRaids) do
+      opts[#opts + 1] = { kind = "opt", key = k }
+    end
   end
 
   CEF.INSTANCE_FILTER_MENU_OPTS = opts
 end
 
--- Laranja = nível mínimo do range, verde = nível máximo (|c … |r como no chat).
-local COLOR_LVL_ORANGE_MIN = "|cffff9933"
-local COLOR_LVL_GREEN_MAX = "|cff33cc33"
-
--- Nome da instância: masmorra (azul-claro) vs raid (âmbar), alinhado a INSTANCE_RAIDS.
-local COLOR_INSTANCE_DUNGEON_NAME = "|cff9fd3ff"
-local COLOR_INSTANCE_RAID_NAME = "|cffffb74d"
-
+-- ============================================================================
+-- Rich text: nome da instância, faixa de níveis, linha de "Era".
+-- ============================================================================
 local function instanceNameRichOpenTag(instanceKey)
-  if instanceKey and INSTANCE_RAIDS[instanceKey] then
+  if instanceKey and INSTANCE_KEY_IS_RAID[instanceKey] then
     return COLOR_INSTANCE_RAID_NAME
   end
   return COLOR_INSTANCE_DUNGEON_NAME
 end
 
 function CEF.instanceKeyIsRaid(instanceKey)
-  return instanceKey ~= nil and instanceKey ~= false and INSTANCE_RAIDS[instanceKey] == true
+  return instanceKey ~= nil and instanceKey ~= false and INSTANCE_KEY_IS_RAID[instanceKey] == true
 end
 
 local function formatLevelRangeColored(plain)
@@ -210,18 +163,27 @@ function CEF.instanceLevelRangeRichText(instanceKey)
   return recommendedLevelRichText(instanceKey)
 end
 
--- Linhas de deteção agrupadas (mesma ordem que o menu de filtro).
+-- Linhas de deteção agrupadas (Classic vs TBC; mesma ideia que o menu de filtro).
 function CEF.getInstanceDetectionRowsGroupedSorted()
-  local d, r = {}, {}
+  local dc, dt, rc, rt = {}, {}, {}, {}
   local seen = {}
   for _, row in ipairs(INSTANCE_ROWS) do
     local k = row.key
     if not seen[k] then
       seen[k] = true
-      if INSTANCE_RAIDS[k] then
-        r[#r + 1] = row
+      local exp = row.expansion or "classic"
+      if row.kind == "raid" then
+        if exp == "tbc" then
+          rt[#rt + 1] = row
+        else
+          rc[#rc + 1] = row
+        end
       else
-        d[#d + 1] = row
+        if exp == "tbc" then
+          dt[#dt + 1] = row
+        else
+          dc[#dc + 1] = row
+        end
       end
     end
   end
@@ -232,38 +194,30 @@ function CEF.getInstanceDetectionRowsGroupedSorted()
     end
     return strlower(a.key) < strlower(b.key)
   end
-  table.sort(d, sortFn)
-  table.sort(r, sortFn)
-  return { dungeons = d, raids = r }
+  table.sort(dc, sortFn)
+  table.sort(dt, sortFn)
+  table.sort(rc, sortFn)
+  table.sort(rt, sortFn)
+  return {
+    dungeonsClassic = dc,
+    dungeonsTbc = dt,
+    raidsClassic = rc,
+    raidsTbc = rt,
+  }
 end
 
 function CEF.instanceFilterOptionRichText(instKey)
+  local L = CEF.L or {}
   if instKey == false or instKey == nil then
-    return "|cffffffffTodas as instâncias|r"
+    return "|cffffffff" .. (L["allInstances"] or "All instances") .. "|r"
   end
-  return instanceNameRichOpenTag(instKey) .. instKey .. "|r  " .. recommendedLevelRichText(instKey)
+  local displayName = CEF.LocalizeInstance and CEF.LocalizeInstance(instKey) or instKey
+  return instanceNameRichOpenTag(instKey) .. displayName .. "|r  " .. recommendedLevelRichText(instKey)
 end
 
--- Scarlet Monastery: 4 alas. Mensagem genérica (sem gy/lib/arm/cath) → assume full clear nas 4.
-local SCARLET_WING_KEYS = { "SM Graveyard", "SM Library", "SM Armory", "SM Cathedral" }
-
-local SCARLET_GENERIC_NEEDLES = {
-  "full sm",
-  "full-sm",
-  "clear sm",
-  "all sm",
-  "sm full",
-  "run sm",
-  "sm run",
-  "full clear sm",
-  "full monastery",
-  "clear monastery",
-  " scarlet monastery",
-  "scarlet monastery",
-  "/sm",
-  " sm/",
-}
-
+-- ============================================================================
+-- Scarlet Monastery: frase genérica sem nomear ala → full clear nas 4 alas.
+-- ============================================================================
 local function listContainsAnyKey(list, keys)
   for _, k in ipairs(list) do
     for _, w in ipairs(keys) do
@@ -306,12 +260,60 @@ local function scarletGenericInText(lower)
   return false
 end
 
+-- ============================================================================
+-- Abreviações ambíguas no fim da linha: «DM» / «WC»
+-- ============================================================================
+-- «DM» sozinho no fim (ex.: «LF3M DPS DM», «… HEALER DM») — sem espaço depois do m.
+local function direMaulIsolatedDmPos(lower)
+  local t = lower:match("^%s*(.-)%s*$") or lower
+  local a = t:find("[%s%p]dm$")
+  if a then
+    return a
+  end
+  if #t >= 3 and t:sub(-2) == "dm" then
+    local prev = t:sub(-3, -3)
+    if prev:match("[%s%p]") then
+      return #t - 3
+    end
+  end
+  if t == "dm" or t:find("^dm[%s%p]", 1) then
+    return 1
+  end
+  return nil
+end
+
+-- «WC» como Wailing Caverns no fim (ex.: «LF1M DPS WC») ou só «wc» + separador.
+local function wailingCavernsIsolatedWcPos(lower)
+  local t = lower:match("^%s*(.-)%s*$") or lower
+  local a = t:find("[%s%p]wc$")
+  if a then
+    return a
+  end
+  if #t >= 3 and t:sub(-2) == "wc" then
+    local prev = t:sub(-3, -3)
+    if prev:match("[%s%p]") then
+      return #t - 3
+    end
+  end
+  if t == "wc" or t:find("^wc[%s%p]", 1) then
+    return 1
+  end
+  return nil
+end
+
+-- ============================================================================
+-- Detecção principal
+-- ============================================================================
 -- Todas as instâncias reconhecidas na mensagem; ordem = primeira ocorrência no texto.
 function CEF.detectInstances(text)
   if not text or text == "" then
     return {}
   end
-  local lower = text:lower()
+  -- Igual a messageLooksLFG: minúsculas + espaços colapsados (evita falhar em «for  wc» no chat).
+  local lower = CEF.normalizeMessage(text)
+  if lower == "" then
+    return {}
+  end
   local hits = {}
   for _, row in ipairs(INSTANCE_ROWS) do
     local bestPos
@@ -323,6 +325,20 @@ function CEF.detectInstances(text)
     end
     if bestPos then
       hits[row.key] = bestPos
+    end
+  end
+
+  if not hits["Dire Maul"] then
+    local pDm = direMaulIsolatedDmPos(lower)
+    if pDm then
+      hits["Dire Maul"] = pDm
+    end
+  end
+
+  if not hits["Wailing Caverns"] then
+    local pWc = wailingCavernsIsolatedWcPos(lower)
+    if pWc then
+      hits["Wailing Caverns"] = pWc
     end
   end
 
@@ -356,6 +372,9 @@ function CEF.detectInstance(text)
   return list[1] or "—"
 end
 
+-- ============================================================================
+-- Helpers para entry.instances (coluna da lista + tooltip)
+-- ============================================================================
 local function entryInstancesList(e)
   if not e then
     return {}
@@ -389,7 +408,8 @@ function CEF.entryInstancesComboRichText(e)
   end
   local parts = {}
   for _, k in ipairs(list) do
-    parts[#parts + 1] = instanceNameRichOpenTag(k) .. k .. "|r  " .. recommendedLevelRichText(k)
+    local name = CEF.LocalizeInstance and CEF.LocalizeInstance(k) or k
+    parts[#parts + 1] = instanceNameRichOpenTag(k) .. name .. "|r  " .. recommendedLevelRichText(k)
   end
   -- Quebra extra (linha em branco) para separar visualmente instâncias.
   return table.concat(parts, "\n\n")
@@ -403,7 +423,8 @@ function CEF.entryInstancesComboRichTextInline(e)
   end
   local parts = {}
   for _, k in ipairs(list) do
-    parts[#parts + 1] = instanceNameRichOpenTag(k) .. k .. "|r  " .. recommendedLevelRichText(k)
+    local name = CEF.LocalizeInstance and CEF.LocalizeInstance(k) or k
+    parts[#parts + 1] = instanceNameRichOpenTag(k) .. name .. "|r  " .. recommendedLevelRichText(k)
   end
   return table.concat(parts, ", ")
 end
@@ -429,6 +450,32 @@ function CEF.entryInstancesSearchBlob(e)
   return table.concat(parts, " ")
 end
 
+-- Coluna «Era» na lista: Classic (marrom) / TBC (verde); misto = duas linhas.
+function CEF.entryExpansionColumnRichText(e)
+  local list = entryInstancesList(e)
+  if #list == 0 then
+    return (Hex.dim or "|cff888888") .. "—|r"
+  end
+  local hasC, hasT = false, false
+  for _, k in ipairs(list) do
+    if (INSTANCE_KEY_EXPANSION[k] or "classic") == "tbc" then
+      hasT = true
+    else
+      hasC = true
+    end
+  end
+  local L = CEF.L or {}
+  local nameClassic = L["eraClassic"] or "Classic"
+  local nameTbc = L["eraTbc"] or "TBC"
+  if hasC and hasT then
+    return COLOR_ERA_CLASSIC_COL .. nameClassic .. "|r\n" .. COLOR_ERA_TBC_COL .. nameTbc .. "|r"
+  end
+  if hasT then
+    return COLOR_ERA_TBC_COL .. nameTbc .. "|r"
+  end
+  return COLOR_ERA_CLASSIC_COL .. nameClassic .. "|r"
+end
+
 -- Leitura para a UI “Termos” (somente referência; listas são as mesmas usadas na deteção).
 function CEF.getInstanceDetectionCatalog()
   return {
@@ -439,4 +486,3 @@ function CEF.getInstanceDetectionCatalog()
     },
   }
 end
-

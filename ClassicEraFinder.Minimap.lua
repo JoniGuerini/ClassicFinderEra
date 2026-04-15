@@ -90,9 +90,10 @@ function state.create(onClickToggle)
 
   b:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:SetText("Classic Era Finder", 1, 0.9, 0.3)
-    GameTooltip:AddLine("Clique esquerdo: abrir ou fechar", 1, 1, 1, true)
-    GameTooltip:AddLine("Arraste com o botão direito: mover no minimapa", 0.75, 0.75, 0.75, true)
+    local L = CEF.L or {}
+    GameTooltip:SetText(L["minimapTitle"] or "Classic Era Finder", 1, 0.9, 0.3)
+    GameTooltip:AddLine(L["minimapLeftClick"] or "Left click: open or close", 1, 1, 1, true)
+    GameTooltip:AddLine(L["minimapDrag"] or "Drag with right button: move on minimap", 0.75, 0.75, 0.75, true)
     GameTooltip:Show()
   end)
   b:SetScript("OnLeave", GameTooltip_Hide)

@@ -1,6 +1,13 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+	<!-- Locales: enUS é sempre carregado primeiro (base + fallback); demais locales sobrescrevem. -->
+	<Script file="Locales\enUS.lua"/>
+	<Script file="Locales\ptBR.lua"/>
+	<Script file="Locales\InstanceNames.lua"/>
 	<Script file="ClassicEraFinder.Constants.lua"/>
+	<Script file="ClassicEraFinder.Theme.lua"/>
+	<Script file="ClassicEraFinder.InstanceData.lua"/>
 	<Script file="ClassicEraFinder.Instances.lua"/>
+	<Script file="ClassicEraFinder.MessagePatterns.lua"/>
 	<Script file="ClassicEraFinder.Messages.lua"/>
 	<Script file="ClassicEraFinder.Filters.lua"/>
 	<Script file="ClassicEraFinder.DB.lua"/>
@@ -8,6 +15,8 @@
 	<Script file="ClassicEraFinder.UIUtils.lua"/>
 	<Script file="ClassicEraFinder.UILayout.lua"/>
 	<Script file="ClassicEraFinder.UIEngine.lua"/>
+	<Script file="ClassicEraFinder.UIDropdown.lua"/>
+	<Script file="ClassicEraFinder.UITerms.lua"/>
        	<Script file="ClassicEraFinder.UI.lua"/>
 	<Script file="ClassicEraFinder.Minimap.lua"/>
 	<Script file="ClassicEraFinder.UIFilters.lua"/>

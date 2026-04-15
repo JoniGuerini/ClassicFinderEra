@@ -4,86 +4,76 @@
 ClassicEraFinder = ClassicEraFinder or {}
 local CEF = ClassicEraFinder
 
+-- Labels dos filtros: resolvidos pelo locale via CEF.L no momento da UI.
+-- Guardamos só a `key` interna aqui; o texto visível é consultado em runtime.
+local function L(key, fallback)
+  local tbl = CEF.L
+  if tbl and tbl[key] then
+    return tbl[key]
+  end
+  return fallback
+end
+
 local INTENT_FILTER_MENU_OPTS = {
-  { key = false, label = "Todos os anúncios" },
-  { key = "invite", label = "Procura grupo" },
-  { key = "whisper", label = "Procura membros" },
+  { key = false, labelKey = "allAnnouncements", labelFallback = "All announcements" },
+  { key = "invite", labelKey = "intentSeekingGroup", labelFallback = "Looking for group" },
+  { key = "whisper", labelKey = "intentRecruiting", labelFallback = "Looking for members" },
 }
+-- Compat: expõe com `label` preenchido dinamicamente (alguns call-sites podem ler).
+for _, opt in ipairs(INTENT_FILTER_MENU_OPTS) do
+  opt.label = L(opt.labelKey, opt.labelFallback)
+end
 CEF.INTENT_FILTER_MENU_OPTS = INTENT_FILTER_MENU_OPTS
 
 function CEF.intentFilterOptionRichText(intentKey)
   if intentKey == false or intentKey == nil then
-    return "|cffffffffTodos os anúncios|r"
+    return "|cffffffff" .. L("allAnnouncements", "All announcements") .. "|r"
   end
   for _, opt in ipairs(INTENT_FILTER_MENU_OPTS) do
     if opt.key == intentKey then
-      return "|cffffffff" .. opt.label .. "|r"
+      return "|cffffffff" .. L(opt.labelKey, opt.labelFallback) .. "|r"
     end
   end
   return "|cffffffff—|r"
 end
 
 local ROLE_FILTER_MENU_OPTS = {
-  { key = false, label = "Qualquer função" },
-  { key = "tank", label = "Tank" },
-  { key = "heal", label = "Healer" },
-  { key = "dps", label = "DPS" },
+  { key = false, labelKey = "anyRole", labelFallback = "Any role" },
+  { key = "tank", labelKey = "roleTank", labelFallback = "Tank" },
+  { key = "heal", labelKey = "roleHeal", labelFallback = "Healer" },
+  { key = "dps", labelKey = "roleDps", labelFallback = "DPS" },
 }
+for _, opt in ipairs(ROLE_FILTER_MENU_OPTS) do
+  opt.label = L(opt.labelKey, opt.labelFallback)
+end
 CEF.ROLE_FILTER_MENU_OPTS = ROLE_FILTER_MENU_OPTS
 
 function CEF.roleFilterOptionRichText(roleKey)
   if roleKey == false or roleKey == nil then
-    return "|cffffffffQualquer função|r"
+    return "|cffffffff" .. L("anyRole", "Any role") .. "|r"
   end
   for _, opt in ipairs(ROLE_FILTER_MENU_OPTS) do
     if opt.key == roleKey then
-      return "|cffffffff" .. opt.label .. "|r"
+      return "|cffffffff" .. L(opt.labelKey, opt.labelFallback) .. "|r"
     end
   end
   return "|cffffffff—|r"
 end
 
--- Palavras que sugerem montagem de grupo / vaga
-local LFG_PLAIN = {
-  "lfg", "lfm", "lf ", "lf1", "lf2", "lf3", "looking for", "need ", "need a", "need 1", "need 2",
-  "group for", "gtg", "forming", "wtb group", "boost", "carry",
-  "procura", "preciso", "precisa", "grupo", "vaga", "tank", "heal", "healer", "dps",
-  "warrior", "paladin", "druid", "rogue", "hunter", "mage", "priest", "lock", "shaman",
-  "guerreiro", "mago", "sacer", "cacador", "ladino",
-}
-
--- Pedidos óbvios de serviço / craft (reforço; o filtro principal é reconhecer masmorra/raid).
--- Evitar termos genéricos tipo "engineering" — batem em "Gnomeregan" etc.
-local PROFESSION_TRADE_EXCLUDE = {
-  "enchanter",
-  "enchantor",
-  "lf enchant",
-  "lfg enchant",
-  "lfm enchant",
-  "need enchant",
-  "need an enchant",
-  "want enchant",
-  " chest enchant",
-  " bracer enchant",
-  " boot enchant",
-  " cloak enchant",
-  " weapon enchant",
-  "+4 stats",
-  "+3 stats",
-  "+8 stats",
-  "stats to chest",
-  "stats on chest",
-  " lockbox",
-  "unlock my",
-  " disenchant",
-  " d/e ",
-  "port to ",
-  "portal to ",
-  "summon to ",
-}
+-- Padrões estáticos vêm de CEF.MessagePatterns (ver ClassicEraFinder.MessagePatterns.lua).
+local P = CEF.MessagePatterns or {}
+local RECRUIT_FIRST_WORDS_LIST = P.RECRUIT_FIRST_WORDS_LIST or {}
+local RECRUIT_FIRST_WORDS      = P.RECRUIT_FIRST_WORDS or {}
+local LFG_PLAIN                = P.LFG_PLAIN or {}
+local PROFESSION_TRADE_EXCLUDE = P.PROFESSION_TRADE_EXCLUDE or {}
 
 local function normalizeMessage(msg)
-  if not msg then return "" end
+  if not msg then
+    return ""
+  end
+  -- NBSP UTF-8 e códigos de cor do chat (evita «dm|r» ou espaço “invisível» sem match).
+  msg = msg:gsub("\194\160", " ")
+  msg = msg:gsub("|c[%x]+", ""):gsub("|r", ""):gsub("|T[^|]+|t", "")
   msg = msg:lower():gsub("%s+", " ")
   return (msg:match("^%s*(.-)%s*$") or msg)
 end
@@ -150,6 +140,14 @@ function CEF.classifyMessageIntent(text)
       return true
     end
     if t:find("^lf%s+sham", 1) or t:find("^lf%s+warrior", 1) or t:find("^lf%s+warlock", 1) then
+      return true
+    end
+    -- "lf <spec/classe/plural> ..." — recrutador descrevendo quem quer no grupo.
+    -- Ex.: "lf resto sham and warlocks for gruul", "lf holy pala for kara",
+    --      "lf warlocks for mag", "lf prot warr".
+    -- Usa RECRUIT_FIRST_WORDS (lista no topo do arquivo, também exposta em Termos).
+    local firstWord = t:match("^lf%s+([%a]+)")
+    if firstWord and RECRUIT_FIRST_WORDS[firstWord] then
       return true
     end
     return false
@@ -360,11 +358,14 @@ function CEF.stripRealm(name)
   return (name:match("^([^%-]+)%-") or name:match("^([^%-]+)$") or name)
 end
 
--- Leitura para a UI “Termos” (referência às listas de messageLooksLFG / exclusões).
+-- Leitura para a UI “Termos” (referência às listas de deteção).
 function CEF.getMessageDetectionCatalog()
   return {
-    lfgHints = LFG_PLAIN,
+    lfgHints              = LFG_PLAIN,
     professionTradeExclude = PROFESSION_TRADE_EXCLUDE,
+    recruitFirstWords     = RECRUIT_FIRST_WORDS_LIST,
+    recruitingIntentHints = P.RECRUITING_INTENT_HINTS or {},
+    seekingIntentHints    = P.SEEKING_INTENT_HINTS or {},
   }
 end
 

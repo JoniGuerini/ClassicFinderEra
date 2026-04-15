@@ -12,23 +12,10 @@ local function getUI()
   return CEF.UI
 end
 
-function UIE.layoutRows()
-  local ui = getUI()
-  local scrollChild = ui.scrollChild
-  local scrollFrame = ui.scrollFrame
-  local rowFrames = ui.rowFrames
-  local CC = CEF.CONST
-  if not scrollChild or not scrollFrame or not rowFrames then
-    return
-  end
-
-  -- Lista filtrada sempre a partir de CEF.state (evita dessincronia com a UI).
+local function computeVisibleRange(scrollFrame, CC)
   CEF.Entries.rebuildFilteredView()
   local filteredView = CEF.Entries.getFilteredView()
   local n = #filteredView
-  if n < 0 then
-    return
-  end
 
   local rowHeights, rowStarts = {}, {}
   local cum = 0
@@ -44,28 +31,23 @@ function UIE.layoutRows()
   end
 
   local totalH = math.max(cum, 1)
-  scrollChild:SetHeight(totalH)
-
   local viewH = scrollFrame:GetHeight() or CC.ROW_HEIGHT
   local maxScroll = math.max(0, totalH - viewH)
   local vs = scrollFrame:GetVerticalScroll() or 0
   if vs > maxScroll then
     vs = maxScroll
-    scrollFrame:SetVerticalScroll(maxScroll)
   elseif vs < 0 then
     vs = 0
-    scrollFrame:SetVerticalScroll(0)
   end
 
-  local scrollY = vs
-  local bottomWithBuffer = scrollY + viewH + (viewH * 0.25)
+  local bottomWithBuffer = vs + viewH + (viewH * 0.25)
 
   local first, last = 1, 0
   if n > 0 then
     local low, high = 1, n
     while low < high do
       local mid = math.floor((low + high) / 2)
-      if rowStarts[mid + 1] <= scrollY then
+      if rowStarts[mid + 1] <= vs then
         low = mid + 1
       else
         high = mid
@@ -77,6 +59,30 @@ function UIE.layoutRows()
       last = last + 1
     end
     last = last - 1
+  end
+
+  return filteredView, n, rowHeights, rowStarts, totalH, vs, maxScroll, first, last
+end
+
+function UIE.layoutRows()
+  local ui = getUI()
+  local scrollChild = ui.scrollChild
+  local scrollFrame = ui.scrollFrame
+  local rowFrames = ui.rowFrames
+  local CC = CEF.CONST
+  if not scrollChild or not scrollFrame or not rowFrames then
+    return
+  end
+
+  local filteredView, n, rowHeights, rowStarts, totalH, vs, maxScroll, first, last =
+    computeVisibleRange(scrollFrame, CC)
+  if n < 0 then
+    return
+  end
+
+  scrollChild:SetHeight(totalH)
+  if vs ~= (scrollFrame:GetVerticalScroll() or 0) then
+    scrollFrame:SetVerticalScroll(vs)
   end
 
   for _, rf in ipairs(rowFrames) do
@@ -100,6 +106,7 @@ function UIE.layoutRows()
       rf.bg = bg
 
       rf.colInst = rf:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      rf.colEra = rf:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
       rf.colLvl = rf:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
       rf.colMsg = rf:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
       rf.colName = rf:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -138,8 +145,10 @@ function UIE.layoutRows()
       end)
 
       rf.colInst:SetJustifyH("LEFT")
+      rf.colEra:SetJustifyH("LEFT")
       rf.colLvl:SetJustifyH("LEFT")
       rf.colInst:SetJustifyV("TOP")
+      rf.colEra:SetJustifyV("TOP")
       rf.colLvl:SetJustifyV("TOP")
       rf.colMsg:SetJustifyH("LEFT")
       rf.colMsg:SetJustifyV("TOP")
@@ -173,6 +182,11 @@ function UIE.layoutRows()
       rowFrames[rowIndex] = rf
     else
       rf:SetClipsChildren(true)
+      if rf and not rf.colEra then
+        rf.colEra = rf:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        rf.colEra:SetJustifyH("LEFT")
+        rf.colEra:SetJustifyV("TOP")
+      end
       if rf and not rf.colLvl then
         rf.colLvl = rf:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         rf.colLvl:SetJustifyH("LEFT")
@@ -203,6 +217,9 @@ function UIE.layoutRows()
     end
 
     rf.colInst:SetText(CEF.entryInstancesComboRichText(e))
+    if rf.colEra then
+      rf.colEra:SetText(CEF.entryExpansionColumnRichText(e))
+    end
     if rf.colLvl then
       rf.colLvl:SetText("")
       rf.colLvl:Hide()
@@ -243,10 +260,11 @@ function UIE.layoutRows()
       rf.actionBtn.cefEntry = e
       rf.actionBtn.cefIntent = intent
       if rf.actionBtn.actionLabel then
+        local L = CEF.L or {}
         if intent == "invite" then
-          rf.actionBtn.actionLabel:SetText("Convidar")
+          rf.actionBtn.actionLabel:SetText(L["actionInvite"] or "Invite")
         else
-          rf.actionBtn.actionLabel:SetText("Sussurro")
+          rf.actionBtn.actionLabel:SetText(L["actionWhisper"] or "Whisper")
         end
       end
 
@@ -301,7 +319,8 @@ function UIE.applyColumnWidths()
   local w = scrollChild:GetWidth()
   local c1, c2, c3, c4, c5, c6, x1, x2, x3, x4, x5, x6 = CEF.UILayout.columnWidths(w)
 
-  local w1 = math.max(100, c1 - CC.COL_GAP)
+  local w1 = math.max(92, c1 - CC.COL_GAP)
+  local w2 = math.max(44, c2 - CC.COL_GAP)
   local w3 = math.max(50, c3 - CC.COL_GAP)
   local w4 = math.max(36, c4 - CC.COL_GAP)
   local w5 = math.max(40, c5 - CC.COL_GAP)
@@ -310,6 +329,9 @@ function UIE.applyColumnWidths()
   for _, rf in ipairs(rowFrames) do
     if rf and rf.colInst then
       rf.colInst:ClearAllPoints()
+      if rf.colEra then
+        rf.colEra:ClearAllPoints()
+      end
       if rf.colLvl then
         rf.colLvl:ClearAllPoints()
         rf.colLvl:SetText("")
@@ -331,6 +353,12 @@ function UIE.applyColumnWidths()
 
       rf.colInst:SetPoint("TOPLEFT", rf, "TOPLEFT", x1, 0)
       rf.colInst:SetWidth(w1)
+      if rf.colEra then
+        rf.colEra:SetJustifyV("MIDDLE")
+        rf.colEra:SetHeight(rh)
+        rf.colEra:SetPoint("TOPLEFT", rf, "TOPLEFT", x2, 0)
+        rf.colEra:SetWidth(w2)
+      end
       rf.colMsg:SetWidth(w3)
       rf.colMsg:SetPoint("TOPLEFT", rf, "TOPLEFT", x3, 0)
       rf.colName:SetWidth(w4)
@@ -372,56 +400,10 @@ function UIE.refreshRelativeTimesOnly()
     return
   end
 
-  CEF.Entries.rebuildFilteredView()
-  local filteredView = CEF.Entries.getFilteredView()
-  local n = #filteredView
+  local filteredView, n, rowHeights, rowStarts, totalH, vs, maxScroll, first, last =
+    computeVisibleRange(scrollFrame, CC)
   if n <= 0 then
     return
-  end
-
-  local rowHeights, rowStarts = {}, {}
-  local cum = 0
-  rowStarts[1] = 0
-  for idx = 1, n do
-    local h = CEF.UILayout.entryRowTotalHeight(filteredView[idx]) or CC.ROW_HEIGHT
-    if h < CC.ROW_HEIGHT then
-      h = CC.ROW_HEIGHT
-    end
-    rowHeights[idx] = h
-    cum = cum + h
-    rowStarts[idx + 1] = cum
-  end
-
-  local totalH = math.max(cum, 1)
-  local viewH = scrollFrame:GetHeight() or CC.ROW_HEIGHT
-  local maxScroll = math.max(0, totalH - viewH)
-  local vs = scrollFrame:GetVerticalScroll() or 0
-  if vs > maxScroll then
-    vs = maxScroll
-  elseif vs < 0 then
-    vs = 0
-  end
-
-  local scrollY = vs
-  local bottomWithBuffer = scrollY + viewH + (viewH * 0.25)
-
-  local first, last = 1, 0
-  if n > 0 then
-    local low, high = 1, n
-    while low < high do
-      local mid = math.floor((low + high) / 2)
-      if rowStarts[mid + 1] <= scrollY then
-        low = mid + 1
-      else
-        high = mid
-      end
-    end
-    first = low
-    last = first
-    while last <= n and rowStarts[last] < bottomWithBuffer do
-      last = last + 1
-    end
-    last = last - 1
   end
 
   local lastShown = math.min(n, last, first + CC.MAX_ROW_FRAMES_POOL - 1)

@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l \"D:/World of Warcraft/_anniversary_/Interface/AddOns/ClassicEraFinder/\"*.lua)",
+      "Bash(grep -nE '\"\\([A-Z][a-zA-Zà-ÿ ]{0,40}\\)[áéíóúâêôãõçÁÉÍÓÚÂÊÔÃÕÇ]' \"D:/World of Warcraft/_anniversary_/Interface/AddOns/ClassicEraFinder/\"*.lua)",
+      "WebFetch(domain:warcraft.wiki.gg)",
+      "WebSearch",
+      "WebFetch(domain:wowpedia.fandom.com)",
+      "WebFetch(domain:www.wowhead.com)",
+      "WebFetch(domain:gitlab.com)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' https://www.wowhead.com/journal-instance=__TRACKED_VAR__)",
+      "Bash(curl -s -L -o /tmp/kara.html \"https://www.wowhead.com/journal-instance=745\")",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" -L \"https://www.wowhead.com/journal-instance=745\")",
+      "WebFetch(domain:github.com)",
+      "Bash(awk 'NR<288 || NR>792' ClassicEraFinder.UI.lua)",
+      "Bash(mv ClassicEraFinder.UI.lua.tmp ClassicEraFinder.UI.lua)",
+      "Bash(awk 'NR<516 || NR>1053' ClassicEraFinder.UI.lua)",
+      "Bash(lua -e 'for _,f in ipairs\\({\"ClassicEraFinder.UI.lua\",\"ClassicEraFinder.UITerms.lua\",\"ClassicEraFinder.UIDropdown.lua\",\"ClassicEraFinder.Theme.lua\",\"ClassicEraFinder.InstanceData.lua\",\"ClassicEraFinder.MessagePatterns.lua\",\"ClassicEraFinder.Instances.lua\",\"ClassicEraFinder.Messages.lua\"}\\) do local ok,err = loadfile\\(f\\); if not ok then print\\(\"SYNTAX ERR in \"..f..\": \"..tostring\\(err\\)\\) else print\\(\"OK: \"..f\\) end end')"
+    ]
+  }
+}

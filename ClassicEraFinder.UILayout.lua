@@ -14,19 +14,20 @@ function UI.columnWidths(totalW)
   local CC = cfg()
   local innerTotal = math.max(280 + CC.INSTANCE_LEVELS_TO_MSG_GAP, totalW - 2 * CC.TABLE_PAD)
   local inner = innerTotal - CC.INSTANCE_LEVELS_TO_MSG_GAP
-  -- Coluna 1 = nome da instância + níveis na mesma linha; c2 fica 0 (compat.).
-  local c1 = inner * 0.21
-  local c2 = 0
-  local c3 = inner * 0.31
-  local c4 = inner * 0.17
-  local c5 = inner * 0.12
-  local c6 = inner * 0.19
+  -- c1 = instância; c2 = Classic/TBC; c3–c6 = mensagem, personagem, tempo, ação.
+  local c1 = inner * 0.175
+  local c2 = inner * 0.075
+  local c3 = inner * 0.285
+  local c4 = inner * 0.155
+  local c5 = inner * 0.11
+  local c6 = inner * 0.20
   local x1 = CC.TABLE_PAD
-  local x3 = x1 + c1 + CC.INSTANCE_LEVELS_TO_MSG_GAP
+  local x2 = x1 + c1 + CC.COL_GAP
+  local x3 = x2 + c2 + CC.INSTANCE_LEVELS_TO_MSG_GAP
   local x4 = x3 + c3
   local x5 = x4 + c4
   local x6 = x5 + c5
-  return c1, c2, c3, c4, c5, c6, x1, x1, x3, x4, x5, x6
+  return c1, c2, c3, c4, c5, c6, x1, x2, x3, x4, x5, x6
 end
 
 function UI.entryMessageDisplayLineBudget(e)
@@ -58,7 +59,15 @@ function UI.entryRowTotalHeight(e)
     edge = 2 * CC.ROW_EDGE_INSET_MULTI
   end
 
-  return math.max(CC.ROW_HEIGHT, instBlock, msgBlock) + edge
+  local h = math.max(CC.ROW_HEIGHT, instBlock, msgBlock) + edge
+  -- «Era» com Classic+TBC em duas linhas precisa de espaço extra.
+  if e then
+    local eraTxt = CEF.entryExpansionColumnRichText(e)
+    if eraTxt and eraTxt:find("\n", 1, true) then
+      h = h + CC.ROW_INSTANCE_LINE
+    end
+  end
+  return h
 end
 
 function UI.layoutHeaderColumns(header)
@@ -75,7 +84,8 @@ function UI.layoutHeaderColumns(header)
     end
   end
   local c1, c2, c3, c4, c5, c6, x1, x2, x3, x4, x5, x6 = UI.columnWidths(w)
-  local w1 = math.max(100, c1 - CC.COL_GAP)
+  local w1 = math.max(92, c1 - CC.COL_GAP)
+  local w2 = math.max(44, c2 - CC.COL_GAP)
   local w3 = math.max(50, c3 - CC.COL_GAP)
   local w4 = math.max(36, c4 - CC.COL_GAP)
   local w5 = math.max(40, c5 - CC.COL_GAP)
@@ -90,8 +100,9 @@ function UI.layoutHeaderColumns(header)
 
   header.h1:SetPoint("LEFT", header, "LEFT", x1, 0)
   header.h1:SetWidth(w1)
-  header.h2:ClearAllPoints()
-  header.h2:Hide()
+  header.h2:SetPoint("LEFT", header, "LEFT", x2, 0)
+  header.h2:SetWidth(w2)
+  header.h2:Show()
   header.h3:SetPoint("LEFT", header, "LEFT", x3, 0)
   header.h3:SetWidth(w3)
   header.h4:SetPoint("LEFT", header, "LEFT", x4, 0)

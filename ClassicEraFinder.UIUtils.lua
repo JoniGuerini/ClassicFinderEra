@@ -136,14 +136,15 @@ function UI.cefTooltipShow(anchorFrame, entry)
 
   tip.body:SetText(UI.expandChatIcons(entry.text))
 
+  local L = CEF.L or {}
   local grey = "|cffaaaaaa"
   local white = "|cffffffff"
   local instBlock = CEF.entryInstancesComboRichText(entry)
-  local meta = grey .. "Instância:|r\n" .. instBlock
+  local meta = grey .. (L["tooltipInstance"] or "Instance:") .. "|r\n" .. instBlock
   local nameColor = UI.classColorRichPrefix(entry.guid)
-  meta = meta .. "\n\n" .. grey .. "Personagem:|r " .. nameColor .. CEF.stripRealm(entry.sender or "") .. "|r"
+  meta = meta .. "\n\n" .. grey .. (L["tooltipCharacter"] or "Character:") .. "|r " .. nameColor .. CEF.stripRealm(entry.sender or "") .. "|r"
   if entry.channel and entry.channel ~= "" then
-    meta = meta .. "\n" .. grey .. "Canal:|r " .. white .. entry.channel .. "|r"
+    meta = meta .. "\n" .. grey .. (L["tooltipChannel"] or "Channel:") .. "|r " .. white .. entry.channel .. "|r"
   end
   tip.meta:SetText(meta)
 
