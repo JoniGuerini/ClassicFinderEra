@@ -140,6 +140,22 @@ CEF.Locale.register("deDE", {
   GUILD_FOOTER_FILTERED = "|cff66ff66Online %d|r |cffaaaaaa/|r |cffffffff%d|r  ·  |cffccccccAngezeigt %d (%d online)|r",
   GUILD_FOOTER_COUNTS = "|cff66ff66Online %d|r |cffaaaaaa/|r |cffffffff%d Mitglieder|r",
 
+  -- Gruppen-Tab
+  TAB_GROUP = "Gruppe",
+  GROUP_EMPTY_NOT_IN_GROUP = "Du bist in keiner Gruppe.",
+  GROUP_TYPE_PARTY = "Gruppe",
+  GROUP_TYPE_RAID = "Schlachtzug",
+  GROUP_LEADER_LABEL = "Anführer:",
+  GROUP_MEMBERS_FMT = "|cffffffff%d Mitglieder|r",
+  GROUP_ONLINE_FMT = "%d online",
+  GROUP_SUBGROUP_FMT = "Gruppe %d",
+  GROUP_ROLE_LEADER = "Anführer",
+  GROUP_ROLE_ASSIST = "Assistent",
+  GROUP_ROLE_MEMBER = "Mitglied",
+  COL_ROLE = "Rolle",
+  COL_GROUP = "Gruppe",
+  STATUS_DEAD = "Tot",
+
   TERMS_ABOUT_TITLE = "|cffffcc66Über diese Seite|r",
   TERMS_ABOUT_BODY = "Referenz der Muster, die Classic Era Finder im Chat verwendet. Raid-Markierungen erscheinen als Icons in der Liste: {square}, {{circle}}, {rt6}, star, skull usw. Listen werden mit neuen Addon-Versionen aktualisiert.",
   TERMS_INSTANCES_TITLE = "|cffffcc66Erkannte Instanzen|r",

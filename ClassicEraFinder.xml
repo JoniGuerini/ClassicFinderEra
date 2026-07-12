@@ -34,6 +34,8 @@
 	<Script file="Features/Chat/ChatUI.lua"/>
 	<Script file="Features/LFG/LFG.lua"/>
 	<Script file="Features/LFG/LFGUI.lua"/>
+	<Script file="Features/Group/Group.lua"/>
+	<Script file="Features/Group/GroupUI.lua"/>
 	<!-- UI main + entry -->
 	<Script file="UI/Main.lua"/>
 	<Script file="UI/Minimap.lua"/>

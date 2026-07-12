@@ -55,10 +55,17 @@ local function refreshChatUI()
   end
 end
 
+local function refreshGroupUI()
+  if CEF.GroupUI and CEF.GroupUI.refresh then
+    CEF.GroupUI.refresh()
+  end
+end
+
 CEF.UI.refreshRelativeTimesOnly = refreshRelativeTimesOnly
 CEF.UI.refreshUI = refreshUI
 CEF.UI.refreshGuildUI = refreshGuildUI
 CEF.UI.refreshChatUI = refreshChatUI
+CEF.UI.refreshGroupUI = refreshGroupUI
 
 local function hideAllFilterDropdowns()
   CEF.UIFilters.hideAllFilterDropdowns(mainFrame)
@@ -186,6 +193,7 @@ end
 local eventFrame = CreateFrame("Frame")
 local staleAgeAcc = 0
 local guildRosterAcc = 0
+local groupRefreshAcc = 0
 eventFrame:SetScript("OnUpdate", function(_, elapsed)
   elapsed = elapsed or 0
   staleAgeAcc = staleAgeAcc + elapsed
@@ -203,6 +211,17 @@ eventFrame:SetScript("OnUpdate", function(_, elapsed)
   else
     guildRosterAcc = 0
   end
+  -- Morte/zona não disparam GROUP_ROSTER_UPDATE; refresh leve com a aba aberta.
+  if mainFrame and mainFrame:IsShown() and mainFrame.cefNavTab == "group" and CEF.Group then
+    groupRefreshAcc = groupRefreshAcc + elapsed
+    if groupRefreshAcc >= 5 then
+      groupRefreshAcc = 0
+      CEF.Group.refreshFromApi()
+      refreshGroupUI()
+    end
+  else
+    groupRefreshAcc = 0
+  end
 end)
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
@@ -218,6 +237,9 @@ eventFrame:RegisterEvent("BN_FRIEND_INFO_CHANGED")
 eventFrame:RegisterEvent("MINIMAP_UPDATE_ZOOM")
 eventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
 eventFrame:RegisterEvent("PLAYER_GUILD_UPDATE")
+eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+eventFrame:RegisterEvent("PARTY_LEADER_CHANGED")
+eventFrame:RegisterEvent("PARTY_LOOT_METHOD_CHANGED")
 eventFrame:RegisterEvent("LFG_LIST_SEARCH_RESULTS_RECEIVED")
 eventFrame:RegisterEvent("LFG_LIST_SEARCH_FAILED")
 eventFrame:RegisterEvent("LFG_LIST_SEARCH_RESULT_UPDATED")
@@ -280,6 +302,15 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
       CEF.Guild.refreshFromApi()
       if mainFrame and mainFrame:IsShown() and mainFrame.cefNavTab == "guild" then
         refreshGuildUI()
+      end
+    end
+  elseif event == "GROUP_ROSTER_UPDATE"
+    or event == "PARTY_LEADER_CHANGED"
+    or event == "PARTY_LOOT_METHOD_CHANGED" then
+    if CEF.Group then
+      CEF.Group.refreshFromApi()
+      if mainFrame and mainFrame:IsShown() and mainFrame.cefNavTab == "group" then
+        refreshGroupUI()
       end
     end
   elseif event == "PLAYER_GUILD_UPDATE" then

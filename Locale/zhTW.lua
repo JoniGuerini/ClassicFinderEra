@@ -141,6 +141,22 @@ CEF.Locale.register("zhTW", {
   GUILD_FOOTER_FILTERED = "|cff66ff66線上 %d|r |cffaaaaaa/|r |cffffffff%d|r  ·  |cffcccccc顯示 %d（線上 %d）|r",
   GUILD_FOOTER_COUNTS = "|cff66ff66線上 %d|r |cffaaaaaa/|r |cffffffff%d 名成員|r",
 
+  -- 隊伍分頁
+  TAB_GROUP = "隊伍",
+  GROUP_EMPTY_NOT_IN_GROUP = "你不在隊伍中。",
+  GROUP_TYPE_PARTY = "小隊",
+  GROUP_TYPE_RAID = "團隊",
+  GROUP_LEADER_LABEL = "隊長：",
+  GROUP_MEMBERS_FMT = "|cffffffff%d 名成員|r",
+  GROUP_ONLINE_FMT = "%d 線上",
+  GROUP_SUBGROUP_FMT = "第%d隊",
+  GROUP_ROLE_LEADER = "隊長",
+  GROUP_ROLE_ASSIST = "助理",
+  GROUP_ROLE_MEMBER = "成員",
+  COL_ROLE = "職責",
+  COL_GROUP = "小隊",
+  STATUS_DEAD = "死亡",
+
   TERMS_ABOUT_TITLE = "|cffffcc66關於本頁|r",
   TERMS_ABOUT_BODY = "Classic Era Finder 在聊天中使用的模式參考。團隊標記會以圖示顯示在清單中：{square}、{{circle}}、{rt6}、star、skull 等。清單會隨插件版本更新。",
   TERMS_INSTANCES_TITLE = "|cffffcc66已辨識副本|r",

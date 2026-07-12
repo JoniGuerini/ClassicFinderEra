@@ -140,6 +140,22 @@ CEF.Locale.register("frFR", {
   GUILD_FOOTER_FILTERED = "|cff66ff66En ligne %d|r |cffaaaaaa/|r |cffffffff%d|r  ·  |cffccccccAffichés %d (%d en ligne)|r",
   GUILD_FOOTER_COUNTS = "|cff66ff66En ligne %d|r |cffaaaaaa/|r |cffffffff%d membres|r",
 
+  -- Onglet Groupe
+  TAB_GROUP = "Groupe",
+  GROUP_EMPTY_NOT_IN_GROUP = "Vous n'êtes pas dans un groupe.",
+  GROUP_TYPE_PARTY = "Groupe",
+  GROUP_TYPE_RAID = "Raid",
+  GROUP_LEADER_LABEL = "Chef :",
+  GROUP_MEMBERS_FMT = "|cffffffff%d membres|r",
+  GROUP_ONLINE_FMT = "%d en ligne",
+  GROUP_SUBGROUP_FMT = "Groupe %d",
+  GROUP_ROLE_LEADER = "Chef",
+  GROUP_ROLE_ASSIST = "Assistant",
+  GROUP_ROLE_MEMBER = "Membre",
+  COL_ROLE = "Rôle",
+  COL_GROUP = "Groupe",
+  STATUS_DEAD = "Mort",
+
   TERMS_ABOUT_TITLE = "|cffffcc66À propos de cette page|r",
   TERMS_ABOUT_BODY = "Référence des motifs utilisés par Classic Era Finder dans le chat. Les marqueurs de raid apparaissent comme icônes dans la liste : {square}, {{circle}}, {rt6}, star, skull, etc. Les listes évoluent avec les versions de l’addon.",
   TERMS_INSTANCES_TITLE = "|cffffcc66Donjons reconnus|r",

@@ -142,6 +142,22 @@ CEF.Locale.register("esMX", {
   GUILD_FOOTER_FILTERED = "|cff66ff66En línea %d|r |cffaaaaaa/|r |cffffffff%d|r  ·  |cffccccccMostrando %d (%d en línea)|r",
   GUILD_FOOTER_COUNTS = "|cff66ff66En línea %d|r |cffaaaaaa/|r |cffffffff%d miembros|r",
 
+  -- Pestaña Grupo
+  TAB_GROUP = "Grupo",
+  GROUP_EMPTY_NOT_IN_GROUP = "No estás en un grupo.",
+  GROUP_TYPE_PARTY = "Grupo",
+  GROUP_TYPE_RAID = "Banda",
+  GROUP_LEADER_LABEL = "Líder:",
+  GROUP_MEMBERS_FMT = "|cffffffff%d miembros|r",
+  GROUP_ONLINE_FMT = "%d en línea",
+  GROUP_SUBGROUP_FMT = "Grupo %d",
+  GROUP_ROLE_LEADER = "Líder",
+  GROUP_ROLE_ASSIST = "Asistente",
+  GROUP_ROLE_MEMBER = "Miembro",
+  COL_ROLE = "Rol",
+  COL_GROUP = "Grupo",
+  STATUS_DEAD = "Muerto",
+
   TERMS_ABOUT_TITLE = "|cffffcc66Acerca de esta página|r",
   TERMS_ABOUT_BODY = "Referencia a los patrones que Classic Era Finder usa en el chat. Los marcadores de banda aparecen como iconos en la lista: {square}, {{circle}}, {rt6}, star, skull, etc. Las listas se actualizan con nuevas versiones del addon.",
   TERMS_INSTANCES_TITLE = "|cffffcc66Calabozos reconocidos|r",

@@ -149,6 +149,22 @@ CEF.Locale.register("enUS", {
   GUILD_FOOTER_FILTERED = "|cff66ff66Online %d|r |cffaaaaaa/|r |cffffffff%d|r  ·  |cffccccccShowing %d (%d online)|r",
   GUILD_FOOTER_COUNTS = "|cff66ff66Online %d|r |cffaaaaaa/|r |cffffffff%d members|r",
 
+  -- Group tab
+  TAB_GROUP = "Group",
+  GROUP_EMPTY_NOT_IN_GROUP = "You are not in a group.",
+  GROUP_TYPE_PARTY = "Party",
+  GROUP_TYPE_RAID = "Raid",
+  GROUP_LEADER_LABEL = "Leader:",
+  GROUP_MEMBERS_FMT = "|cffffffff%d members|r",
+  GROUP_ONLINE_FMT = "%d online",
+  GROUP_SUBGROUP_FMT = "Group %d",
+  GROUP_ROLE_LEADER = "Leader",
+  GROUP_ROLE_ASSIST = "Assistant",
+  GROUP_ROLE_MEMBER = "Member",
+  COL_ROLE = "Role",
+  COL_GROUP = "Group",
+  STATUS_DEAD = "Dead",
+
   -- Terms page
   TERMS_ABOUT_TITLE = "|cffffcc66About this page|r",
   TERMS_ABOUT_BODY = "Reference to the patterns Classic Era Finder uses in chat. Raid markers show as icons in the list: {square}, {{circle}}, {rt6}, star, skull, etc. Lists update with new addon versions.",

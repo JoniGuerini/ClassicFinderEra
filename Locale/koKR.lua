@@ -140,6 +140,22 @@ CEF.Locale.register("koKR", {
   GUILD_FOOTER_FILTERED = "|cff66ff66온라인 %d|r |cffaaaaaa/|r |cffffffff%d|r  ·  |cffcccccc표시 %d (온라인 %d)|r",
   GUILD_FOOTER_COUNTS = "|cff66ff66온라인 %d|r |cffaaaaaa/|r |cffffffff멤버 %d명|r",
 
+  -- 그룹 탭
+  TAB_GROUP = "그룹",
+  GROUP_EMPTY_NOT_IN_GROUP = "파티에 속해 있지 않습니다.",
+  GROUP_TYPE_PARTY = "파티",
+  GROUP_TYPE_RAID = "공격대",
+  GROUP_LEADER_LABEL = "파티장:",
+  GROUP_MEMBERS_FMT = "|cffffffff%d명|r",
+  GROUP_ONLINE_FMT = "온라인 %d명",
+  GROUP_SUBGROUP_FMT = "%d조",
+  GROUP_ROLE_LEADER = "파티장",
+  GROUP_ROLE_ASSIST = "부파티장",
+  GROUP_ROLE_MEMBER = "파티원",
+  COL_ROLE = "역할",
+  COL_GROUP = "조",
+  STATUS_DEAD = "죽음",
+
   TERMS_ABOUT_TITLE = "|cffffcc66이 페이지 안내|r",
   TERMS_ABOUT_BODY = "Classic Era Finder가 채팅에서 사용하는 패턴 참고입니다. 공격대 징표는 목록에 아이콘으로 표시됩니다: {square}, {{circle}}, {rt6}, star, skull 등. 목록은 애드온 버전에 따라 갱신됩니다.",
   TERMS_INSTANCES_TITLE = "|cffffcc66인식되는 던전|r",

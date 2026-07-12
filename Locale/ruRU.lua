@@ -140,6 +140,22 @@ CEF.Locale.register("ruRU", {
   GUILD_FOOTER_FILTERED = "|cff66ff66В сети %d|r |cffaaaaaa/|r |cffffffff%d|r  ·  |cffccccccПоказано %d (%d в сети)|r",
   GUILD_FOOTER_COUNTS = "|cff66ff66В сети %d|r |cffaaaaaa/|r |cffffffff%d участников|r",
 
+  -- Вкладка «Группа»
+  TAB_GROUP = "Группа",
+  GROUP_EMPTY_NOT_IN_GROUP = "Вы не состоите в группе.",
+  GROUP_TYPE_PARTY = "Группа",
+  GROUP_TYPE_RAID = "Рейд",
+  GROUP_LEADER_LABEL = "Лидер:",
+  GROUP_MEMBERS_FMT = "|cffffffffУчастников: %d|r",
+  GROUP_ONLINE_FMT = "в сети: %d",
+  GROUP_SUBGROUP_FMT = "Группа %d",
+  GROUP_ROLE_LEADER = "Лидер",
+  GROUP_ROLE_ASSIST = "Помощник",
+  GROUP_ROLE_MEMBER = "Участник",
+  COL_ROLE = "Роль",
+  COL_GROUP = "Группа",
+  STATUS_DEAD = "Мертв",
+
   TERMS_ABOUT_TITLE = "|cffffcc66Об этой странице|r",
   TERMS_ABOUT_BODY = "Справка по шаблонам, которые Classic Era Finder использует в чате. Рейдовые метки отображаются как значки в списке: {square}, {{circle}}, {rt6}, star, skull и т. д. Списки обновляются с новыми версиями аддона.",
   TERMS_INSTANCES_TITLE = "|cffffcc66Распознаваемые подземелья|r",

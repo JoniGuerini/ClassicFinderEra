@@ -153,6 +153,7 @@ function CEF.UI.createMainUI()
   local btnLfg = makeNavTabButton(navBar, 8 + TAB_BTN_W + 4, CEF.L.TAB_LFG)
   local btnGuilda = makeNavTabButton(navBar, 8 + (TAB_BTN_W + 4) * 2, CEF.L.TAB_GUILD)
   local btnMensagens = makeNavTabButton(navBar, 8 + (TAB_BTN_W + 4) * 3, CEF.L.TAB_MESSAGES)
+  local btnGrupo = makeNavTabButton(navBar, 8 + (TAB_BTN_W + 4) * 4, CEF.L.TAB_GROUP)
   local btnTermos = makeNavTabButton(navBar, nil, CEF.L.TAB_TERMS)
   btnTermos:SetPoint("RIGHT", navBar, "RIGHT", -8, 0)
   f.cefNavBar = navBar
@@ -160,6 +161,7 @@ function CEF.UI.createMainUI()
   f.cefBtnLfg = btnLfg
   f.cefBtnGuilda = btnGuilda
   f.cefBtnMensagens = btnMensagens
+  f.cefBtnGrupo = btnGrupo
   f.cefBtnTermos = btnTermos
 
   local filterBar = CreateFrame("Frame", nil, f)
@@ -1720,6 +1722,9 @@ function CEF.UI.createMainUI()
   if CEF.LFGUI and CEF.LFGUI.createPanels then
     CEF.LFGUI.createPanels(f, navBar)
   end
+  if CEF.GroupUI and CEF.GroupUI.createPanels then
+    CEF.GroupUI.createPanels(f, navBar)
+  end
   if f.guildFilterBar then
     f.guildFilterBar:SetFrameLevel(240)
   end
@@ -1734,6 +1739,15 @@ function CEF.UI.createMainUI()
   end
   if f.lfgRoot then
     f.lfgRoot:SetFrameLevel(50)
+  end
+  if f.groupInfoBar then
+    f.groupInfoBar:SetFrameLevel(240)
+  end
+  if f.groupHeader then
+    f.groupHeader:SetFrameLevel(50)
+  end
+  if f.groupScrollFrame then
+    f.groupScrollFrame:SetFrameLevel(50)
   end
 
   local function syncTableLayout()
@@ -1767,6 +1781,7 @@ function CEF.UI.createMainUI()
     local isLfg = which == "lfg"
     local isGuild = which == "guild"
     local isMessages = which == "messages"
+    local isGroup = which == "group"
     local isSettings = which == "settings"
 
     -- Saiu de Mensagens sem enviar: remove rascunho vazio e limpa o composer.
@@ -1789,6 +1804,7 @@ function CEF.UI.createMainUI()
     styleNavTab(btnLfg, isLfg)
     styleNavTab(btnGuilda, isGuild)
     styleNavTab(btnMensagens, isMessages)
+    styleNavTab(btnGrupo, isGroup)
     styleNavTab(btnTermos, isSettings)
 
     CEF.UIFilters.hideAllFilterDropdowns(f)
@@ -1828,6 +1844,16 @@ function CEF.UI.createMainUI()
 
     if f.chatRoot then
       f.chatRoot:SetShown(isMessages)
+    end
+
+    if f.groupInfoBar then
+      f.groupInfoBar:SetShown(isGroup)
+    end
+    if f.groupHeader then
+      f.groupHeader:SetShown(isGroup)
+    end
+    if f.groupScrollFrame then
+      f.groupScrollFrame:SetShown(isGroup)
     end
 
     settingsTopPanel:SetShown(isSettings)
@@ -1876,6 +1902,15 @@ function CEF.UI.createMainUI()
       elseif CEF.ChatUI and CEF.ChatUI.refresh then
         CEF.ChatUI.refresh()
       end
+    elseif isGroup then
+      if CEF.Group and CEF.Group.refreshFromApi then
+        CEF.Group.refreshFromApi()
+      end
+      if f.cefScheduleGroupLayoutSync then
+        f.cefScheduleGroupLayoutSync()
+      elseif f.cefSyncGroupLayout then
+        f.cefSyncGroupLayout()
+      end
     else
       settingsScroll:SetScript("OnUpdate", function(self)
         self:SetScript("OnUpdate", nil)
@@ -1891,6 +1926,9 @@ function CEF.UI.createMainUI()
     end
     if f.cefSyncGuildScroll then
       f.cefSyncGuildScroll()
+    end
+    if f.cefSyncGroupScroll then
+      f.cefSyncGroupScroll()
     end
     if f.cefSyncSettingsScroll then
       f.cefSyncSettingsScroll()
@@ -1908,6 +1946,9 @@ function CEF.UI.createMainUI()
   end)
   btnMensagens:SetScript("OnClick", function()
     applyNavTab("messages")
+  end)
+  btnGrupo:SetScript("OnClick", function()
+    applyNavTab("group")
   end)
   btnTermos:SetScript("OnClick", function()
     applyNavTab("settings")
@@ -1984,6 +2025,12 @@ function CEF.UI.createMainUI()
       elseif CEF.ChatUI and CEF.ChatUI.refresh then
         CEF.ChatUI.refresh()
       end
+    elseif f.cefNavTab == "group" then
+      if f.cefScheduleGroupLayoutSync then
+        f.cefScheduleGroupLayoutSync()
+      elseif f.cefSyncGroupLayout then
+        f.cefSyncGroupLayout()
+      end
     end
   end
 
@@ -2029,6 +2076,12 @@ function CEF.UI.createMainUI()
       elseif CEF.ChatUI and CEF.ChatUI.refresh then
         CEF.ChatUI.refresh()
       end
+    elseif f.cefNavTab == "group" then
+      if f.cefScheduleGroupLayoutSync then
+        f.cefScheduleGroupLayoutSync()
+      elseif f.cefSyncGroupLayout then
+        f.cefSyncGroupLayout()
+      end
     end
   end
 
@@ -2058,6 +2111,10 @@ function CEF.UI.createMainUI()
     elseif f.cefNavTab == "messages" then
       if f.cefScheduleChatLayoutSync then
         f.cefScheduleChatLayoutSync()
+      end
+    elseif f.cefNavTab == "group" then
+      if f.cefScheduleGroupLayoutSync then
+        f.cefScheduleGroupLayoutSync()
       end
     end
     if f.cefRelayoutSettingsTerms then
@@ -2102,6 +2159,9 @@ function CEF.UI.createMainUI()
       if f.cefNavTab == "messages" and f.cefScheduleChatLayoutSync then
         f.cefScheduleChatLayoutSync()
       end
+      if f.cefNavTab == "group" and f.cefScheduleGroupLayoutSync then
+        f.cefScheduleGroupLayoutSync()
+      end
       if f.cefRelayoutSettingsTerms and f.cefNavTab == "settings" then
         f.cefRelayoutSettingsTerms()
       end
@@ -2138,6 +2198,9 @@ function CEF.UI.createMainUI()
     end
     if btnMensagens and btnMensagens.fs then
       btnMensagens.fs:SetText(CEF.L.TAB_MESSAGES)
+    end
+    if btnGrupo and btnGrupo.fs then
+      btnGrupo.fs:SetText(CEF.L.TAB_GROUP)
     end
     if btnTermos and btnTermos.fs then
       btnTermos.fs:SetText(CEF.L.TAB_TERMS)
@@ -2199,6 +2262,9 @@ function CEF.UI.createMainUI()
     end
     if f.cefApplyChatLocale then
       f.cefApplyChatLocale()
+    end
+    if f.cefApplyGroupLocale then
+      f.cefApplyGroupLocale()
     end
     CEF.UI.refreshUI()
     if f.cefRebuildLocaleMenu and f.filterLocaleMenu and f.filterLocaleMenu:IsShown() then
