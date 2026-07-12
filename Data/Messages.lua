@@ -114,6 +114,92 @@ local LFG_PLAIN = {
   "procura", "preciso", "precisa", "grupo", "vaga", "tank", "heal", "healer", "dps",
   "warrior", "paladin", "druid", "rogue", "hunter", "mage", "priest", "lock", "shaman",
   "guerreiro", "mago", "sacer", "cacador", "ladino",
+  -- Italiano
+  "cerco", "cerchiamo", "gruppo", "manca", "servono",
+  -- Alemão
+  "suche", "suchen", "gesucht", "brauchen", "gruppe", "heiler",
+  -- Francês
+  "cherche", "recherche", "cherchons", "manque", "besoin", "groupe", "soigneur",
+  -- Espanhol
+  "busco", "buscamos", "se busca", "necesito", "necesitamos", "tanque", "sanador",
+  -- Russo (normalizado por lowerCyrillic)
+  "ищу", "ищем", "нужен", "нужны", "требу", "группу", "группа", "пати", "танк", "хил", "дд",
+  -- Coreano
+  "구함", "구직", "모집", "파티", "팟", "탱", "힐", "딜",
+  -- Chinês (simpl./trad.); gate ainda exige detetar a instância na mensagem
+  "求组", "求組", "求队", "求隊", "组队", "組隊", "开团", "開團", "缺", "招", "徵",
+  "坦", "奶", "补", "補", "输出", "輸出", "治疗", "治療",
+}
+
+-- Recrutamento (LFM: líder busca gente) noutros idiomas → ação Sussurro.
+local LFM_I18N_NEEDLES = {
+  -- Português (reforço)
+  "procuramos", "recrutando", "so falta", "só falta",
+  -- Italiano
+  "cerchiamo", "ci manca", "ci serve", "servono",
+  "cerco tank", "cerco un tank", "cerco heal", "cerco healer", "cerco un heal", "cerco dps", "cerco un dps",
+  "manca tank", "manca heal", "manca healer", "manca dps",
+  "serve tank", "serve heal", "serve healer", "serve dps",
+  -- Alemão
+  "wir suchen", "suchen noch", "brauchen noch", "noch platz", "letzter platz",
+  "suchen tank", "suchen heiler", "suchen heal", "suchen dd", "suchen dps",
+  "brauchen tank", "brauchen heiler", "brauchen dd", "brauchen dps",
+  "suche tank", "suche heiler", "suche dd", "suche dps",
+  "tank gesucht", "heiler gesucht", "heal gesucht", "healer gesucht", "dd gesucht", "dps gesucht",
+  -- Francês
+  "cherchons", "on cherche", "recherchons", "on recherche",
+  "cherche tank", "cherche heal", "cherche dps",
+  "manque tank", "manque heal", "manque dps", "il manque", "il nous manque",
+  "besoin d'un", "besoin d'une", "besoin d’un", "besoin d’une",
+  "besoin tank", "besoin heal", "besoin dps",
+  -- Espanhol
+  "buscamos", "se busca", "necesitamos", "hace falta", "faltan",
+  "necesito tank", "necesito tanque", "necesito heal", "necesito healer", "necesito dps",
+  "busco tank", "busco tanque", "busco heal", "busco healer", "busco dps",
+  "falta tank", "falta tanque", "falta heal", "falta healer", "falta dps",
+  -- Russo
+  "ищем", "нужен танк", "нужен хил", "нужен дд", "нужны", "требуется", "требуются",
+  "набираем", "наберем", "наберём", "набор в",
+  "ищу танка", "ищу хила", "ищу дд",
+  -- Coreano
+  "모집", "구인",
+  "탱 구함", "탱구함", "탱커 구함", "탱커구함",
+  "힐 구함", "힐구함", "힐러 구함", "힐러구함",
+  "딜 구함", "딜구함", "딜러 구함", "딜러구함",
+  "한자리", "한 자리",
+  -- Chinês (simpl./trad.)
+  "缺t", "缺坦", "缺奶", "缺补", "缺補", "缺治疗", "缺治療", "缺输出", "缺輸出", "缺dps",
+  "缺人", "缺1", "缺2", "缺3", "缺几", "缺幾",
+  "还差", "還差", "差1", "差2", "差一个", "差一個",
+  "招人", "招t", "招坦", "招奶", "徵人", "徵坦", "徵補",
+  "来个t", "来个奶", "來個坦", "來個補", "来t", "来奶",
+}
+
+-- Procura de grupo (LFG: jogador busca vaga) noutros idiomas → ação Convidar.
+local LFG_I18N_NEEDLES = {
+  -- Português (reforço)
+  "procurando grupo", "procuro pt", "procuro vaga", "busco vaga",
+  -- Italiano
+  "cerco gruppo", "cerco un gruppo", "cerco party", "cerco pt", "cerco grp",
+  -- Alemão
+  "suche gruppe", "suche eine gruppe", "suche grp", "gruppe gesucht", "suche anschluss",
+  -- Francês
+  "cherche groupe", "cherche un groupe", "recherche groupe", "recherche un groupe", "cherche grp",
+  -- Espanhol
+  "busco grupo", "busco un grupo", "busco party", "busco pt", "busco grp",
+  -- Russo
+  "ищу группу", "ищу групу", "ищу пати", "ищу пт", "возьмите в группу", "возьмите в пати",
+  -- Coreano
+  "구직", "파티 구함", "파티구함", "팟 구함", "팟구함", "자리 구함", "자리구함", "파티 구해요", "팟 구해요",
+  -- Chinês (simpl./trad.)
+  "求组", "求組", "求队", "求隊", "求个组", "求個組", "求进组", "求進組", "求带", "求帶", "求拉", "有组吗", "有組嗎",
+}
+
+-- Termos de função noutros idiomas para o filtro de role (Chat).
+local ROLE_I18N_NEEDLES = {
+  tank = { "tanque", "танк", " мт ", "탱", "坦" },
+  heal = { "heiler", "soigneur", "sanador", "хил", "힐", "奶", "补", "補", "治疗", "治療" },
+  dps = { " dd ", " dds ", " дд", "дамаг", "딜", "输出", "輸出" },
 }
 
 -- Pedidos óbvios de serviço / craft (reforço; o filtro principal é reconhecer masmorra/raid).
@@ -146,6 +232,24 @@ local PROFESSION_TRADE_EXCLUDE = {
   "summon to ",
 }
 
+-- lower() do cliente não converte cirílico (Ищу→ищу); faz à mão (UTF-8, 2 bytes).
+local function lowerCyrillic(s)
+  if not s:find("\208", 1, true) then
+    return s
+  end
+  -- А-П (U+0410–041F) → а-п
+  s = s:gsub("\208([\144-\159])", function(b)
+    return "\208" .. string.char(b:byte() + 32)
+  end)
+  -- Р-Я (U+0420–042F) → р-я
+  s = s:gsub("\208([\160-\175])", function(b)
+    return "\209" .. string.char(b:byte() - 32)
+  end)
+  -- Ё → ё
+  s = s:gsub("\208\129", "\209\145")
+  return s
+end
+
 local function normalizeMessage(msg)
   if not msg then
     return ""
@@ -153,7 +257,7 @@ local function normalizeMessage(msg)
   -- NBSP UTF-8 e códigos de cor do chat (evita «dm|r» ou espaço “invisível» sem match).
   msg = msg:gsub("\194\160", " ")
   msg = msg:gsub("|c[%x]+", ""):gsub("|r", ""):gsub("|T[^|]+|t", "")
-  msg = msg:lower():gsub("%s+", " ")
+  msg = lowerCyrillic(msg:lower()):gsub("%s+", " ")
   return (msg:match("^%s*(.-)%s*$") or msg)
 end
 
@@ -221,6 +325,11 @@ function CEF.classifyMessageIntent(text)
     if t:find("^lf%s+sham", 1) or t:find("^lf%s+warrior", 1) or t:find("^lf%s+warlock", 1) then
       return true
     end
+    for _, needle in ipairs(LFM_I18N_NEEDLES) do
+      if t:find(needle, 1, true) then
+        return true
+      end
+    end
     return false
   end
 
@@ -236,6 +345,11 @@ function CEF.classifyMessageIntent(text)
     end
     if t:find("procuro grupo", 1, true) or t:find("procura grupo", 1, true) or t:find("pf grupo", 1, true) then
       return true
+    end
+    for _, needle in ipairs(LFG_I18N_NEEDLES) do
+      if t:find(needle, 1, true) then
+        return true
+      end
     end
     return false
   end
@@ -290,6 +404,15 @@ function CEF.passesInstanceFinderFilter(text)
   return true
 end
 
+local function matchesAnyNeedle(padded, needles)
+  for _, needle in ipairs(needles) do
+    if padded:find(needle, 1, true) then
+      return true
+    end
+  end
+  return false
+end
+
 -- Filtro por função (tank/heal/dps) baseado no texto da mensagem.
 function CEF.messageMatchesRoleFilter(text, roleKey)
   if roleKey == false or roleKey == nil then
@@ -332,6 +455,9 @@ function CEF.messageMatchesRoleFilter(text, roleKey)
     if (p:find("precisamos", 1, true) and p:find("tank", 1, true)) or (p:find("falta", 1, true) and p:find("tank", 1, true)) then
       return true
     end
+    if matchesAnyNeedle(p, ROLE_I18N_NEEDLES.tank) then
+      return true
+    end
     return false
   end
 
@@ -367,6 +493,9 @@ function CEF.messageMatchesRoleFilter(text, roleKey)
       return true
     end
     if (p:find("precisamos", 1, true) and p:find("heal", 1, true)) or (p:find("falta", 1, true) and p:find("heal", 1, true)) then
+      return true
+    end
+    if matchesAnyNeedle(p, ROLE_I18N_NEEDLES.heal) then
       return true
     end
     return false
@@ -416,6 +545,9 @@ function CEF.messageMatchesRoleFilter(text, roleKey)
       return true
     end
     if (p:find("precisamos", 1, true) and p:find("dps", 1, true)) or (p:find("falta", 1, true) and p:find("dps", 1, true)) then
+      return true
+    end
+    if matchesAnyNeedle(p, ROLE_I18N_NEEDLES.dps) then
       return true
     end
     return false

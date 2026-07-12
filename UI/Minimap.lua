@@ -118,28 +118,72 @@ function state.create(onClickToggle)
   return b
 end
 
---- Fecha o tray do MinimapButtonButton se estiver aberto (sem API pública).
-function state.collapseExternalCollectors()
-  local main = _G.MinimapButtonButtonButton
+--- Fecha o tray do MinimapButtonButton se estiver aberto.
+--- O MBB guarda `buttonsShown` numa tabela interna (não no `_G` até o logout).
+--- Hide manual sem atualizar esse estado deixa migalha e reabre no /reload.
+local function mbbFindButtonContainer(main)
   if not main or type(main.GetChildren) ~= "function" then
-    return
+    return nil
   end
-  local open = false
   local children = { main:GetChildren() }
   for i = 1, #children do
     local child = children[i]
-    if child and child.IsShown and child:IsShown() then
-      open = true
-      break
+    if child and child.IsObjectType and child:IsObjectType("Frame") then
+      return child
     end
   end
-  if not open then
+  return nil
+end
+
+local function mbbSyncButtonsShown(shown)
+  local opts = _G.MinimapButtonButtonOptions
+  if type(opts) == "table" then
+    opts.buttonsShown = shown and true or false
+  end
+end
+
+local function mbbEnsureLogoutPersist()
+  if state._mbbLogoutFrame then
     return
   end
-  -- Usa o OnMouseDown do MBB (LeftButton = toggle) para manter o estado interno certo.
+  -- Regista tarde (no 1º collapse) para correr depois do handler do MBB,
+  -- que faz `_G.MinimapButtonButtonOptions = options` no PLAYER_LOGOUT.
+  local f = CreateFrame("Frame")
+  f:RegisterEvent("PLAYER_LOGOUT")
+  f:SetScript("OnEvent", function()
+    if state._mbbCollapsedThisSession then
+      mbbSyncButtonsShown(false)
+    end
+  end)
+  state._mbbLogoutFrame = f
+end
+
+function state.collapseExternalCollectors()
+  local main = _G.MinimapButtonButtonButton
+  if not main then
+    return
+  end
+
+  local container = mbbFindButtonContainer(main)
+  if not container or not container.IsShown or not container:IsShown() then
+    return
+  end
+
+  state._mbbCollapsedThisSession = true
+  mbbEnsureLogoutPersist()
+
+  -- Caminho preferido: toggle oficial (LeftButton) → hideButtons() atualiza options interno.
   local onMouseDown = main.GetScript and main:GetScript("OnMouseDown")
   if type(onMouseDown) == "function" then
-    pcall(onMouseDown, main, "LeftButton")
+    local ok = pcall(onMouseDown, main, "LeftButton")
+    if ok and not container:IsShown() then
+      mbbSyncButtonsShown(false)
+      return
+    end
   end
+
+  -- Fallback seguro: só o container (não outros children), + sync do SV.
+  pcall(container.Hide, container)
+  mbbSyncButtonsShown(false)
 end
 

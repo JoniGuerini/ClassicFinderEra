@@ -121,7 +121,7 @@ function CEF.UI.createMainUI()
   end)
 
   local NAV_H = 30
-  local TAB_BTN_W = 108
+  local TAB_BTN_W = 96
   local TAB_BTN_H = 24
 
   local navBar = CreateFrame("Frame", nil, f)
@@ -150,12 +150,14 @@ function CEF.UI.createMainUI()
   end
 
   local btnLista = makeNavTabButton(navBar, 8, CEF.L.TAB_LIST)
-  local btnGuilda = makeNavTabButton(navBar, 8 + TAB_BTN_W + 4, CEF.L.TAB_GUILD)
-  local btnMensagens = makeNavTabButton(navBar, 8 + (TAB_BTN_W + 4) * 2, CEF.L.TAB_MESSAGES)
+  local btnLfg = makeNavTabButton(navBar, 8 + TAB_BTN_W + 4, CEF.L.TAB_LFG)
+  local btnGuilda = makeNavTabButton(navBar, 8 + (TAB_BTN_W + 4) * 2, CEF.L.TAB_GUILD)
+  local btnMensagens = makeNavTabButton(navBar, 8 + (TAB_BTN_W + 4) * 3, CEF.L.TAB_MESSAGES)
   local btnTermos = makeNavTabButton(navBar, nil, CEF.L.TAB_TERMS)
   btnTermos:SetPoint("RIGHT", navBar, "RIGHT", -8, 0)
   f.cefNavBar = navBar
   f.cefBtnLista = btnLista
+  f.cefBtnLfg = btnLfg
   f.cefBtnGuilda = btnGuilda
   f.cefBtnMensagens = btnMensagens
   f.cefBtnTermos = btnTermos
@@ -1715,6 +1717,9 @@ function CEF.UI.createMainUI()
   if CEF.ChatUI and CEF.ChatUI.createPanels then
     CEF.ChatUI.createPanels(f, navBar)
   end
+  if CEF.LFGUI and CEF.LFGUI.createPanels then
+    CEF.LFGUI.createPanels(f, navBar)
+  end
   if f.guildFilterBar then
     f.guildFilterBar:SetFrameLevel(240)
   end
@@ -1726,6 +1731,9 @@ function CEF.UI.createMainUI()
   end
   if f.guildFooter then
     f.guildFooter:SetFrameLevel(240)
+  end
+  if f.lfgRoot then
+    f.lfgRoot:SetFrameLevel(50)
   end
 
   local function syncTableLayout()
@@ -1756,6 +1764,7 @@ function CEF.UI.createMainUI()
     local prevTab = f.cefNavTab
     f.cefNavTab = which
     local isList = which == "list"
+    local isLfg = which == "lfg"
     local isGuild = which == "guild"
     local isMessages = which == "messages"
     local isSettings = which == "settings"
@@ -1777,15 +1786,32 @@ function CEF.UI.createMainUI()
     end
 
     styleNavTab(btnLista, isList)
+    styleNavTab(btnLfg, isLfg)
     styleNavTab(btnGuilda, isGuild)
     styleNavTab(btnMensagens, isMessages)
     styleNavTab(btnTermos, isSettings)
 
     CEF.UIFilters.hideAllFilterDropdowns(f)
+    if f.lfgCategoryMenu then
+      f.lfgCategoryMenu:Hide()
+    end
+    if f.lfgActivityMenu then
+      f.lfgActivityMenu:Hide()
+    end
+    if f.lfgCategoryBtn and CEF.UIFilters and CEF.UIFilters.setDropChevronOpen then
+      CEF.UIFilters.setDropChevronOpen(f.lfgCategoryBtn, false)
+    end
+    if f.lfgActivityBtn and CEF.UIFilters and CEF.UIFilters.setDropChevronOpen then
+      CEF.UIFilters.setDropChevronOpen(f.lfgActivityBtn, false)
+    end
 
     filterBar:SetShown(isList)
     header:SetShown(isList)
     scrollFrame:SetShown(isList)
+
+    if f.lfgRoot then
+      f.lfgRoot:SetShown(isLfg)
+    end
 
     if f.guildFilterBar then
       f.guildFilterBar:SetShown(isGuild)
@@ -1816,6 +1842,14 @@ function CEF.UI.createMainUI()
           f.cefSyncListScroll()
         end
       end)
+    elseif isLfg then
+      if CEF.LFG and CEF.LFG.search then
+        -- Busca automática ao abrir a aba (gesto do clique na tab).
+        CEF.LFG.search()
+      end
+      if CEF.LFGUI and CEF.LFGUI.refresh then
+        CEF.LFGUI.refresh()
+      end
     elseif isGuild then
       if CEF.Guild then
         if CEF.Guild.requestRoster then
@@ -1865,6 +1899,9 @@ function CEF.UI.createMainUI()
 
   btnLista:SetScript("OnClick", function()
     applyNavTab("list")
+  end)
+  btnLfg:SetScript("OnClick", function()
+    applyNavTab("lfg")
   end)
   btnGuilda:SetScript("OnClick", function()
     applyNavTab("guild")
@@ -2093,6 +2130,9 @@ function CEF.UI.createMainUI()
     if btnLista and btnLista.fs then
       btnLista.fs:SetText(CEF.L.TAB_LIST)
     end
+    if btnLfg and btnLfg.fs then
+      btnLfg.fs:SetText(CEF.L.TAB_LFG)
+    end
     if btnGuilda and btnGuilda.fs then
       btnGuilda.fs:SetText(CEF.L.TAB_GUILD)
     end
@@ -2101,6 +2141,9 @@ function CEF.UI.createMainUI()
     end
     if btnTermos and btnTermos.fs then
       btnTermos.fs:SetText(CEF.L.TAB_TERMS)
+    end
+    if CEF.LFGUI and CEF.LFGUI.refreshLocale then
+      CEF.LFGUI.refreshLocale(f)
     end
     searchPlaceholder:SetText(CEF.L.SEARCH_PLACEHOLDER_LIST)
     resetFs:SetText(CEF.L.RESET)

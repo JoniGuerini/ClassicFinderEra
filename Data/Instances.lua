@@ -403,6 +403,47 @@ function CEF.instanceLevelRangeRichText(instanceKey)
   return recommendedLevelRichText(instanceKey)
 end
 
+--- Texto colorido "min-max" (laranja/verde) a partir de bounds numéricos.
+function CEF.formatLevelBoundsRichText(minV, maxV)
+  minV = tonumber(minV)
+  maxV = tonumber(maxV)
+  if not minV or minV <= 0 then
+    return nil
+  end
+  if not maxV or maxV <= 0 then
+    return formatLevelRangeColored(tostring(minV))
+  end
+  if maxV == minV then
+    return formatLevelRangeColored(tostring(minV))
+  end
+  return formatLevelRangeColored(minV .. "-" .. maxV)
+end
+
+--- Resolve min/max recomendados a partir do nome localizado da atividade LFG.
+function CEF.levelBoundsForDisplayName(activityName)
+  if type(activityName) ~= "string" or activityName == "" then
+    return nil, nil
+  end
+  local exactKey, partialKey = nil, nil
+  for key in pairs(INSTANCE_LEVEL_RANGE) do
+    local dn = CEF.getInstanceDisplayName(key)
+    if type(dn) == "string" and dn ~= "" then
+      if dn == activityName then
+        exactKey = key
+        break
+      end
+      if not partialKey and (activityName:find(dn, 1, true) or dn:find(activityName, 1, true)) then
+        partialKey = key
+      end
+    end
+  end
+  local key = exactKey or partialKey
+  if not key then
+    return nil, nil
+  end
+  return instanceLevelRangeBounds(key)
+end
+
 -- Linhas de deteção agrupadas (mesma ordem que o menu de filtro).
 function CEF.getInstanceDetectionRowsGroupedSorted()
   local d, r = {}, {}

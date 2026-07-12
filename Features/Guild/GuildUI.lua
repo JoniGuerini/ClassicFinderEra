@@ -1031,7 +1031,7 @@ function GUI.createPanels(f, navBar)
   guildHeader:Hide()
   local hTex = guildHeader:CreateTexture(nil, "BACKGROUND")
   hTex:SetAllPoints()
-  hTex:SetColorTexture(0.1, 0.09, 0.08, 1)
+  hTex:SetColorTexture(0.2, 0.18, 0.12, 0.95)
   local labels = {
     CEF.L.COL_NAME,
     CEF.L.COL_LEVEL,

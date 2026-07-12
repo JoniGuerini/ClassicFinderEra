@@ -5,6 +5,7 @@ Addon para **World of Warcraft Classic Era** que lê o chat (LFG/LFM), organiza 
 ## Funcionalidades
 
 - **Lista** — anúncios de grupo detectados no chat, com filtros por instância, intenção e função
+- **LFG** — listagens do Group Finder oficial da Blizzard (C_LFGList), com vagas por função
 - **Guilda** — roster com filtros, ordenação por cabeçalho e cores de nível relativas ao seu personagem
 - **Mensagens** — conversas Battle.net e sussurros no jogo, com histórico local, resposta citada e exclusão confirmada
 - **Termos** — referência das palavras-chave / padrões usados na detecção

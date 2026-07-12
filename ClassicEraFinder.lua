@@ -218,6 +218,10 @@ eventFrame:RegisterEvent("BN_FRIEND_INFO_CHANGED")
 eventFrame:RegisterEvent("MINIMAP_UPDATE_ZOOM")
 eventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
 eventFrame:RegisterEvent("PLAYER_GUILD_UPDATE")
+eventFrame:RegisterEvent("LFG_LIST_SEARCH_RESULTS_RECEIVED")
+eventFrame:RegisterEvent("LFG_LIST_SEARCH_FAILED")
+eventFrame:RegisterEvent("LFG_LIST_SEARCH_RESULT_UPDATED")
+eventFrame:RegisterEvent("LFG_LIST_AVAILABILITY_UPDATE")
 eventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "ADDON_LOADED" then
     if (...) == ADDON_NAME then
@@ -259,6 +263,13 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     or event == "BN_FRIEND_INFO_CHANGED" then
     if CEF.Chat and CEF.Chat.handleEvent then
       CEF.Chat.handleEvent(event, ...)
+    end
+  elseif event == "LFG_LIST_SEARCH_RESULTS_RECEIVED"
+    or event == "LFG_LIST_SEARCH_FAILED"
+    or event == "LFG_LIST_SEARCH_RESULT_UPDATED"
+    or event == "LFG_LIST_AVAILABILITY_UPDATE" then
+    if CEF.LFG and CEF.LFG.handleEvent then
+      CEF.LFG.handleEvent(event, ...)
     end
   elseif event == "MINIMAP_UPDATE_ZOOM" then
     if CEF.Minimap and CEF.Minimap.place then
