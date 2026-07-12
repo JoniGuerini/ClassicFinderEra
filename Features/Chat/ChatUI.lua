@@ -320,6 +320,7 @@ function GUI.refreshThread(f)
 
   local id = CEF.Chat.getActiveId()
   local conv = CEF.Chat.getConversation(id)
+  local dash = f.chatDash
   if not conv then
     headerFs:SetText(CEF.L.CHAT_SELECT_CONVERSATION)
     if typeFs then
@@ -335,6 +336,10 @@ function GUI.refreshThread(f)
     if emptyNoteFs then
       emptyNoteFs:Show()
       emptyNoteFs:SetText(CEF.L.CHAT_EMPTY_THREAD_NOTE or "")
+    end
+    if dash and dash.refresh then
+      dash:refresh()
+      dash:Show()
     end
     if composer then
       composer:Hide()
@@ -354,6 +359,9 @@ function GUI.refreshThread(f)
   end
   if emptyNoteFs then
     emptyNoteFs:Hide()
+  end
+  if dash then
+    dash:Hide()
   end
   if composer then
     composer:Show()
@@ -912,18 +920,98 @@ function GUI.createPanels(f, navBar)
   f.chatMsgChild = msgChild
   f.chatMsgRows = {}
 
+  -- Mini-dashboard no estado vazio (BNet + sussurros + não respondidas).
+  local dash = CreateFrame("Frame", nil, right)
+  dash:SetSize(400, 78)
+  dash:SetPoint("BOTTOM", msgScroll, "CENTER", 0, 52)
+  dash:Hide()
+  f.chatDash = dash
+
+  local DASH_CARD_W = 124
+  local DASH_CARD_GAP = 14
+  local function makeDashStat(parent, x)
+    local card = CreateFrame("Frame", nil, parent)
+    card:SetSize(DASH_CARD_W, 72)
+    card:SetPoint("TOPLEFT", parent, "TOPLEFT", x, 0)
+    local bg = card:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0.1, 0.09, 0.08, 0.95)
+    local label = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    label:SetPoint("TOPLEFT", card, "TOPLEFT", 10, -10)
+    label:SetPoint("TOPRIGHT", card, "TOPRIGHT", -10, -10)
+    label:SetJustifyH("LEFT")
+    label:SetTextColor(0.75, 0.7, 0.58)
+    local value = card:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    value:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -6)
+    value:SetPoint("TOPRIGHT", label, "BOTTOMRIGHT", 0, -6)
+    value:SetJustifyH("LEFT")
+    value:SetTextColor(1, 0.9, 0.45)
+    local sub = card:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    sub:SetPoint("TOPLEFT", value, "BOTTOMLEFT", 0, -4)
+    sub:SetPoint("TOPRIGHT", value, "BOTTOMRIGHT", 0, -4)
+    sub:SetJustifyH("LEFT")
+    sub:SetTextColor(0.55, 0.52, 0.48)
+    card.label = label
+    card.value = value
+    card.sub = sub
+    return card
+  end
+
+  dash.bnet = makeDashStat(dash, 0)
+  dash.whisper = makeDashStat(dash, DASH_CARD_W + DASH_CARD_GAP)
+  dash.unanswered = makeDashStat(dash, (DASH_CARD_W + DASH_CARD_GAP) * 2)
+
+  function dash:refreshLocale()
+    if self.bnet and self.bnet.label then
+      self.bnet.label:SetText(CEF.L.CHAT_DASH_BNET)
+    end
+    if self.whisper and self.whisper.label then
+      self.whisper.label:SetText(CEF.L.CHAT_DASH_WHISPERS)
+    end
+    if self.unanswered and self.unanswered.label then
+      self.unanswered.label:SetText(CEF.L.CHAT_DASH_UNANSWERED)
+    end
+  end
+
+  function dash:refresh()
+    self:refreshLocale()
+    local stats = (CEF.Chat.getDashboardStats and CEF.Chat.getDashboardStats()) or {}
+    local online = tonumber(stats.bnetOnline) or 0
+    local total = tonumber(stats.bnetTotal) or 0
+    local whispers = tonumber(stats.whispers) or 0
+    local unanswered = tonumber(stats.unanswered) or 0
+    if self.bnet then
+      self.bnet.value:SetText(tostring(online) .. " / " .. tostring(total))
+      self.bnet.sub:SetText(CEF.L.CHAT_DASH_BNET_SUB or "")
+    end
+    if self.whisper then
+      self.whisper.value:SetText(tostring(whispers))
+      self.whisper.sub:SetText(CEF.L.CHAT_DASH_WHISPERS_SUB or "")
+    end
+    if self.unanswered then
+      self.unanswered.value:SetText(tostring(unanswered))
+      self.unanswered.sub:SetText(CEF.L.CHAT_DASH_UNANSWERED_SUB or "")
+      if unanswered > 0 then
+        self.unanswered.value:SetTextColor(1, 0.72, 0.42)
+      else
+        self.unanswered.value:SetTextColor(1, 0.9, 0.45)
+      end
+    end
+  end
+  dash:refreshLocale()
+
   local emptyFs = right:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-  emptyFs:SetPoint("BOTTOM", msgScroll, "CENTER", 0, 10)
-  emptyFs:SetWidth(380)
+  emptyFs:SetPoint("TOP", dash, "BOTTOM", 0, -18)
+  emptyFs:SetWidth(400)
   emptyFs:SetJustifyH("CENTER")
-  emptyFs:SetJustifyV("BOTTOM")
+  emptyFs:SetJustifyV("TOP")
   emptyFs:SetWordWrap(true)
   emptyFs:SetText(CEF.L.CHAT_EMPTY_THREAD)
   f.chatThreadEmpty = emptyFs
 
   local emptyNoteFs = right:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   emptyNoteFs:SetPoint("TOP", emptyFs, "BOTTOM", 0, -14)
-  emptyNoteFs:SetWidth(380)
+  emptyNoteFs:SetWidth(400)
   emptyNoteFs:SetJustifyH("CENTER")
   emptyNoteFs:SetJustifyV("TOP")
   emptyNoteFs:SetWordWrap(true)
@@ -1008,6 +1096,9 @@ function GUI.createPanels(f, navBar)
     end
     if f.chatThreadEmptyNote then
       f.chatThreadEmptyNote:SetText(CEF.L.CHAT_EMPTY_THREAD_NOTE or "")
+    end
+    if f.chatDash and f.chatDash.refreshLocale then
+      f.chatDash:refreshLocale()
     end
     GUI.refresh()
   end

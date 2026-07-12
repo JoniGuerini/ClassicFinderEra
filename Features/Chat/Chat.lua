@@ -418,15 +418,46 @@ function Chat.getActiveId()
 end
 
 function Chat.setActiveId(id)
+  local prev = activeConversationId
   if activeConversationId ~= id then
     pendingReply = nil
   end
   activeConversationId = id
+  -- Rascunho sem mensagens (ex.: whisper da Guilda sem enviar) não deve ficar.
+  if prev and prev ~= id then
+    Chat.pruneEmptyConversation(prev)
+  end
   if id and conversations[id] then
     conversations[id].unread = 0
     Chat.persist()
   end
   notify()
+end
+
+--- Remove conversa sem mensagens. Se for a ativa, limpa a seleção.
+function Chat.pruneEmptyConversation(id)
+  if not id then
+    return false
+  end
+  local c = conversations[id]
+  if not c or #(c.messages or {}) > 0 then
+    return false
+  end
+  conversations[id] = nil
+  if activeConversationId == id then
+    activeConversationId = nil
+    pendingReply = nil
+    nextOutgoingReply = nil
+    pendingOutgoingBody = nil
+  end
+  Chat.persist()
+  notify()
+  return true
+end
+
+--- Descarta a conversa ativa se ainda não tiver nenhuma mensagem.
+function Chat.discardEmptyActive()
+  return Chat.pruneEmptyConversation(activeConversationId)
 end
 
 function Chat.getConversation(id)
@@ -493,6 +524,42 @@ function Chat.getWhisperList()
     return strlower(a.name or "") < strlower(b.name or "")
   end)
   return list
+end
+
+--- Contagens para o painel vazio da aba Mensagens (ignora filtro de busca).
+function Chat.getDashboardStats()
+  local bnetTotal, bnetOnline = 0, 0
+  local n = (BNGetNumFriends and BNGetNumFriends()) or 0
+  for i = 1, n do
+    local accountID, _, isOnline = friendAccountInfo(i)
+    if accountID then
+      bnetTotal = bnetTotal + 1
+      if isOnline then
+        bnetOnline = bnetOnline + 1
+      end
+    end
+  end
+  local whispers, unread, unanswered = 0, 0, 0
+  for _, c in pairs(conversations) do
+    local msgs = c.messages or {}
+    if #msgs > 0 then
+      if c.kind == "whisper" then
+        whispers = whispers + 1
+      end
+      unread = unread + (tonumber(c.unread) or 0)
+      local last = msgs[#msgs]
+      if last and last.dir == "in" then
+        unanswered = unanswered + 1
+      end
+    end
+  end
+  return {
+    bnetTotal = bnetTotal,
+    bnetOnline = bnetOnline,
+    whispers = whispers,
+    unread = unread,
+    unanswered = unanswered,
+  }
 end
 
 -- Mantido por compatibilidade; preferir getWhisperList / getBnetFriends.

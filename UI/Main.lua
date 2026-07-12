@@ -1753,11 +1753,29 @@ function CEF.UI.createMainUI()
   end
 
   local function applyNavTab(which)
+    local prevTab = f.cefNavTab
     f.cefNavTab = which
     local isList = which == "list"
     local isGuild = which == "guild"
     local isMessages = which == "messages"
     local isSettings = which == "settings"
+
+    -- Saiu de Mensagens sem enviar: remove rascunho vazio e limpa o composer.
+    if prevTab == "messages" and which ~= "messages" then
+      if CEF.Chat and CEF.Chat.discardEmptyActive then
+        CEF.Chat.discardEmptyActive()
+      end
+      if f.chatEditBox then
+        f.chatEditBox:SetText("")
+        if f.chatEditBox.ClearFocus then
+          f.chatEditBox:ClearFocus()
+        end
+        if f.chatUpdateCharCount then
+          f.chatUpdateCharCount()
+        end
+      end
+    end
+
     styleNavTab(btnLista, isList)
     styleNavTab(btnGuilda, isGuild)
     styleNavTab(btnMensagens, isMessages)

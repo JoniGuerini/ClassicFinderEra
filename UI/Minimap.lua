@@ -118,3 +118,28 @@ function state.create(onClickToggle)
   return b
 end
 
+--- Fecha o tray do MinimapButtonButton se estiver aberto (sem API pública).
+function state.collapseExternalCollectors()
+  local main = _G.MinimapButtonButtonButton
+  if not main or type(main.GetChildren) ~= "function" then
+    return
+  end
+  local open = false
+  local children = { main:GetChildren() }
+  for i = 1, #children do
+    local child = children[i]
+    if child and child.IsShown and child:IsShown() then
+      open = true
+      break
+    end
+  end
+  if not open then
+    return
+  end
+  -- Usa o OnMouseDown do MBB (LeftButton = toggle) para manter o estado interno certo.
+  local onMouseDown = main.GetScript and main:GetScript("OnMouseDown")
+  if type(onMouseDown) == "function" then
+    pcall(onMouseDown, main, "LeftButton")
+  end
+end
+

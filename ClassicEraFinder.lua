@@ -99,11 +99,23 @@ local function toggleMainFrame()
   if mainFrame:IsShown() then
     CEF.UIUtils.cefTooltipHide()
     hideAllFilterDropdowns()
+    if CEF.Chat and CEF.Chat.discardEmptyActive then
+      CEF.Chat.discardEmptyActive()
+    end
+    if mainFrame.chatEditBox then
+      mainFrame.chatEditBox:SetText("")
+      if mainFrame.chatEditBox.ClearFocus then
+        mainFrame.chatEditBox:ClearFocus()
+      end
+    end
     mainFrame:Hide()
     if uiTicker then
       uiTicker:Hide()
     end
   else
+    if CEF.Minimap and CEF.Minimap.collapseExternalCollectors then
+      CEF.Minimap.collapseExternalCollectors()
+    end
     mainFrame:Show()
     if scrollFrame and scrollChild and mainFrame.header then
       scrollChild:SetWidth(scrollFrame:GetWidth())
@@ -139,6 +151,9 @@ local function openWhisperInHub(name)
     CEF.UIFilters.hideAllFilterDropdowns(mainFrame)
   end
   if not mainFrame:IsShown() then
+    if CEF.Minimap and CEF.Minimap.collapseExternalCollectors then
+      CEF.Minimap.collapseExternalCollectors()
+    end
     mainFrame:Show()
     if uiTicker then
       uiTicker:Show()
