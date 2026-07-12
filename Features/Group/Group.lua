@@ -145,6 +145,7 @@ function Group.refreshFromApi()
         local short = stripName(name)
         members[#members + 1] = {
           unit = "raid" .. i,
+          raidIndex = i,
           name = name,
           nameShort = short,
           level = tonumber(level) or 0,
@@ -200,6 +201,106 @@ function Group.getCounts()
     dead = dead,
     leader = leader,
   }
+end
+
+-- ===== Edição do grupo (mover subgrupos, liderança, remoção) =====
+
+function Group.playerIsLeader()
+  return (UnitIsGroupLeader and UnitIsGroupLeader("player")) and true or false
+end
+
+function Group.playerIsAssist()
+  return (UnitIsGroupAssistant and UnitIsGroupAssistant("player")) and true or false
+end
+
+--- Pode arrastar/mover membros entre subgrupos (só em raid, líder ou assistente).
+function Group.canEditRaid()
+  return inRaid and (Group.playerIsLeader() or Group.playerIsAssist())
+end
+
+function Group.subgroupCount(subgroup)
+  local n = 0
+  for _, m in ipairs(members) do
+    if m.subgroup == subgroup then
+      n = n + 1
+    end
+  end
+  return n
+end
+
+local function editGuard()
+  if not Group.canEditRaid() then
+    return false, "GROUP_ERR_NO_PERMISSION"
+  end
+  if InCombatLockdown and InCombatLockdown() then
+    return false, "GROUP_ERR_COMBAT"
+  end
+  return true
+end
+
+--- Move um membro para o subgrupo alvo. Devolve ok, chaveDeErro.
+function Group.moveToSubgroup(member, subgroup)
+  local ok, err = editGuard()
+  if not ok then
+    return false, err
+  end
+  subgroup = tonumber(subgroup)
+  if not member or not member.raidIndex or not subgroup or subgroup < 1 or subgroup > 8 then
+    return false, nil
+  end
+  if member.subgroup == subgroup then
+    return false, nil
+  end
+  if Group.subgroupCount(subgroup) >= 5 then
+    return false, "GROUP_ERR_FULL"
+  end
+  SetRaidSubgroup(member.raidIndex, subgroup)
+  return true
+end
+
+--- Troca dois membros de subgrupo (para quando o destino está cheio).
+function Group.swapMembers(a, b)
+  local ok, err = editGuard()
+  if not ok then
+    return false, err
+  end
+  if not a or not b or not a.raidIndex or not b.raidIndex or a.raidIndex == b.raidIndex then
+    return false, nil
+  end
+  SwapRaidSubgroup(a.raidIndex, b.raidIndex)
+  return true
+end
+
+function Group.promoteToLeader(member)
+  if not Group.playerIsLeader() or not member or member.isSelf then
+    return false, "GROUP_ERR_NOT_LEADER"
+  end
+  PromoteToLeader(member.name)
+  return true
+end
+
+function Group.promoteToAssistant(member)
+  if not inRaid or not Group.playerIsLeader() or not member or member.isSelf then
+    return false, "GROUP_ERR_NOT_LEADER"
+  end
+  PromoteToAssistant(member.name)
+  return true
+end
+
+function Group.demoteFromAssistant(member)
+  if not inRaid or not Group.playerIsLeader() or not member then
+    return false, "GROUP_ERR_NOT_LEADER"
+  end
+  DemoteAssistant(member.name)
+  return true
+end
+
+function Group.removeFromGroup(member)
+  if not (Group.playerIsLeader() or Group.playerIsAssist()) or not member or member.isSelf then
+    return false, "GROUP_ERR_NO_PERMISSION"
+  end
+  UninviteUnit(member.name)
+  return true
 end
 
 -- Rótulo da coluna Função (Líder / Assistente / Membro) + ícone de mestre do saque.

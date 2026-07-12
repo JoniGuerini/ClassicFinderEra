@@ -77,8 +77,561 @@ function GUI.updateInfoBar()
   local ui = CEF.UI or {}
   local fs = ui.groupInfoLabel
   if fs then
-    fs:SetText(CEF.Group.summaryRichText())
+    local text = CEF.Group.summaryRichText()
+    if CEF.Group.canEditRaid and CEF.Group.canEditRaid() then
+      text = text .. "  |cffaaaaaa·|r  |cff888888" .. CEF.L.GROUP_EDIT_HINT .. "|r"
+    end
+    fs:SetText(text)
   end
+end
+
+-- ===== Feedback de ações (erros de permissão/combate/grupo cheio) =====
+
+local function notifyActionError(errKey, ...)
+  if not errKey then
+    return
+  end
+  local msg = CEF.L(errKey, ...)
+  if DEFAULT_CHAT_FRAME then
+    DEFAULT_CHAT_FRAME:AddMessage("|cffffcc66CEF:|r " .. msg)
+  end
+end
+
+-- ===== Cores base das linhas (usadas por hover/drag para restaurar) =====
+
+local function applyRowBaseBg(rf)
+  if not rf or not rf.bg then
+    return
+  end
+  if rf.cefKind == "hdr" then
+    rf.bg:SetColorTexture(0.16, 0.13, 0.08, 0.98)
+  elseif rf.cefEven then
+    rf.bg:SetColorTexture(0.1, 0.1, 0.12, 0.85)
+  else
+    rf.bg:SetColorTexture(0.08, 0.08, 0.1, 0.85)
+  end
+end
+
+-- ===== Menu de contexto (sussurrar, liderança, assistente, remover) =====
+
+local CTX_W = 190
+local CTX_ROW_H = 22
+local CTX_HEADER_H = 22
+local CTX_PAD = 4
+
+local function makeMenuChrome(menu)
+  local bg = menu:CreateTexture(nil, "BACKGROUND")
+  bg:SetAllPoints()
+  bg:SetColorTexture(0.05, 0.048, 0.06, 0.99)
+  local br, bgc, bb, ba = 0.55, 0.45, 0.18, 0.85
+  local function edge(isH, point1, point2)
+    local t = menu:CreateTexture(nil, "BORDER")
+    if isH then
+      t:SetHeight(1)
+    else
+      t:SetWidth(1)
+    end
+    t:SetColorTexture(br, bgc, bb, ba)
+    t:SetPoint(point1, menu, point1, 0, 0)
+    t:SetPoint(point2, menu, point2, 0, 0)
+  end
+  edge(true, "TOPLEFT", "TOPRIGHT")
+  edge(true, "BOTTOMLEFT", "BOTTOMRIGHT")
+  edge(false, "TOPLEFT", "BOTTOMLEFT")
+  edge(false, "TOPRIGHT", "BOTTOMRIGHT")
+end
+
+function GUI.hideMemberContextMenu()
+  local f = CEF.UI and CEF.UI.mainFrame
+  if f and f.groupMemberContextMenu then
+    f.groupMemberContextMenu:Hide()
+  end
+  if f and f.cefGroupContextOutsideCloser then
+    f.cefGroupContextOutsideCloser:Hide()
+  end
+  if CEF.UIFilters and CEF.UIFilters.syncFilterDropBlocker then
+    CEF.UIFilters.syncFilterDropBlocker(f)
+  end
+end
+
+local function ensureGroupContextOutsideCloser(f)
+  if f.cefGroupContextOutsideCloser then
+    return f.cefGroupContextOutsideCloser
+  end
+  local closer = CreateFrame("Button", nil, f)
+  closer:Hide()
+  closer:SetAllPoints(f)
+  closer:SetFrameLevel(500)
+  closer:EnableMouse(true)
+  closer:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  local tex = closer:CreateTexture(nil, "BACKGROUND")
+  tex:SetAllPoints()
+  tex:SetColorTexture(0, 0, 0, 0.001)
+  closer:SetScript("OnClick", function()
+    GUI.hideMemberContextMenu()
+  end)
+  f.cefGroupContextOutsideCloser = closer
+  return closer
+end
+
+local function ensureGroupContextMenu(f)
+  if f.groupMemberContextMenu then
+    return f.groupMemberContextMenu
+  end
+  local menu = CreateFrame("Frame", nil, f)
+  menu:SetSize(CTX_W, 100)
+  menu:SetFrameStrata("TOOLTIP")
+  menu:SetFrameLevel(560)
+  menu:EnableMouse(true)
+  menu:Hide()
+  makeMenuChrome(menu)
+  f.groupMemberContextMenu = menu
+
+  local headerBg = menu:CreateTexture(nil, "BACKGROUND")
+  headerBg:SetPoint("TOPLEFT", menu, "TOPLEFT", 1, -1)
+  headerBg:SetPoint("TOPRIGHT", menu, "TOPRIGHT", -1, -1)
+  headerBg:SetHeight(CTX_HEADER_H)
+  headerBg:SetColorTexture(0.12, 0.1, 0.08, 1)
+
+  local headerFs = menu:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  headerFs:SetPoint("TOPLEFT", menu, "TOPLEFT", 10, -1)
+  headerFs:SetPoint("BOTTOMRIGHT", menu, "TOPRIGHT", -10, -1 - CTX_HEADER_H)
+  headerFs:SetJustifyH("LEFT")
+  headerFs:SetJustifyV("MIDDLE")
+  headerFs:SetText("")
+  menu.headerFs = headerFs
+
+  local sep = menu:CreateTexture(nil, "ARTWORK")
+  sep:SetHeight(1)
+  sep:SetColorTexture(0.55, 0.45, 0.18, 0.7)
+  sep:SetPoint("TOPLEFT", menu, "TOPLEFT", 1, -1 - CTX_HEADER_H)
+  sep:SetPoint("TOPRIGHT", menu, "TOPRIGHT", -1, -1 - CTX_HEADER_H)
+
+  local function makeCtxRow()
+    local row = CreateFrame("Button", nil, menu)
+    row:SetHeight(CTX_ROW_H)
+    row:RegisterForClicks("LeftButtonUp")
+    row:EnableMouse(true)
+    local rb = row:CreateTexture(nil, "BACKGROUND")
+    rb:SetAllPoints()
+    rb:SetColorTexture(0.13, 0.11, 0.09, 0.96)
+    row.bg = rb
+    local fs = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    fs:SetPoint("LEFT", row, "LEFT", 8, 0)
+    fs:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+    fs:SetJustifyH("LEFT")
+    fs:SetTextColor(1, 0.92, 0.55)
+    row.label = fs
+    row:SetScript("OnEnter", function(self)
+      self.bg:SetColorTexture(0.22, 0.18, 0.12, 1)
+    end)
+    row:SetScript("OnLeave", function(self)
+      self.bg:SetColorTexture(0.13, 0.11, 0.09, 0.96)
+    end)
+    row:Hide()
+    return row
+  end
+
+  menu.whisperRow = makeCtxRow()
+  menu.leaderRow = makeCtxRow()
+  menu.assistRow = makeCtxRow()
+  menu.kickRow = makeCtxRow()
+
+  local function runAction(fn)
+    local m = menu.cefMember
+    GUI.hideMemberContextMenu()
+    if not m then
+      return
+    end
+    local ok, errKey = fn(m)
+    if not ok and errKey then
+      notifyActionError(errKey)
+    end
+  end
+
+  menu.whisperRow:SetScript("OnClick", function()
+    local m = menu.cefMember
+    GUI.hideMemberContextMenu()
+    if not m or not m.name or m.name == "" or m.isSelf then
+      return
+    end
+    if CEF.UI and CEF.UI.openWhisperInHub then
+      CEF.UI.openWhisperInHub(m.nameShort or m.name)
+    end
+  end)
+  menu.leaderRow:SetScript("OnClick", function()
+    runAction(CEF.Group.promoteToLeader)
+  end)
+  menu.assistRow:SetScript("OnClick", function()
+    local m = menu.cefMember
+    if m and m.isAssist then
+      runAction(CEF.Group.demoteFromAssistant)
+    else
+      runAction(CEF.Group.promoteToAssistant)
+    end
+  end)
+  menu.kickRow:SetScript("OnClick", function()
+    runAction(CEF.Group.removeFromGroup)
+  end)
+
+  return menu
+end
+
+function GUI.showMemberContextMenu(member)
+  local f = CEF.UI and CEF.UI.mainFrame
+  if not f or not member then
+    return
+  end
+  if CEF.UIFilters and CEF.UIFilters.hideAllFilterDropdowns then
+    CEF.UIFilters.hideAllFilterDropdowns(f)
+  end
+  local menu = ensureGroupContextMenu(f)
+  menu.cefMember = member
+
+  local colorTag = "|cffffffff"
+  if CEF.Guild and CEF.Guild.classColorPrefix then
+    colorTag = CEF.Guild.classColorPrefix(member.classFile)
+  end
+  menu.headerFs:SetText(colorTag .. (member.nameShort or member.name or "") .. "|r")
+
+  local isLeader = CEF.Group.playerIsLeader()
+  local isAssist = CEF.Group.playerIsAssist()
+  local inRaid = CEF.Group.isRaid()
+
+  menu.whisperRow.label:SetText(CEF.L.WHISPER)
+  menu.leaderRow.label:SetText(CEF.L.GROUP_CTX_PROMOTE_LEADER)
+  menu.assistRow.label:SetText(member.isAssist and CEF.L.GROUP_CTX_DEMOTE_ASSIST or CEF.L.GROUP_CTX_PROMOTE_ASSIST)
+  menu.kickRow.label:SetText(CEF.L.GROUP_CTX_KICK)
+
+  -- Só mostra o que o jogador realmente pode fazer com este alvo.
+  local rows = {}
+  if not member.isSelf then
+    rows[#rows + 1] = menu.whisperRow
+  end
+  if isLeader and not member.isSelf then
+    rows[#rows + 1] = menu.leaderRow
+  end
+  if isLeader and inRaid and not member.isSelf and not member.isLeader then
+    rows[#rows + 1] = menu.assistRow
+  end
+  if (isLeader or isAssist) and not member.isSelf and not member.isLeader then
+    rows[#rows + 1] = menu.kickRow
+  end
+  if #rows == 0 then
+    return
+  end
+
+  menu.whisperRow:Hide()
+  menu.leaderRow:Hide()
+  menu.assistRow:Hide()
+  menu.kickRow:Hide()
+  local y = -1 - CTX_HEADER_H - 1 - CTX_PAD
+  for _, row in ipairs(rows) do
+    row:ClearAllPoints()
+    row:SetPoint("TOPLEFT", menu, "TOPLEFT", 4, y)
+    row:SetPoint("TOPRIGHT", menu, "TOPRIGHT", -4, y)
+    row.bg:SetColorTexture(0.13, 0.11, 0.09, 0.96)
+    row:Show()
+    y = y - CTX_ROW_H
+  end
+  local menuH = CTX_PAD * 2 + CTX_HEADER_H + 1 + CTX_ROW_H * #rows
+  menu:SetSize(CTX_W, menuH)
+
+  menu:ClearAllPoints()
+  local scale = UIParent:GetEffectiveScale() or 1
+  if scale < 0.01 then
+    scale = 1
+  end
+  local cx, cy = GetCursorPosition()
+  local x, yy = cx / scale, cy / scale
+  local uiW = UIParent:GetWidth() or 1024
+  if x + CTX_W > uiW then
+    x = uiW - CTX_W - 4
+  end
+  if yy - menuH < 0 then
+    yy = menuH + 4
+  end
+  menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, yy)
+
+  local closer = ensureGroupContextOutsideCloser(f)
+  closer:SetFrameLevel(500)
+  closer:Show()
+  menu:SetFrameLevel(560)
+  menu:Show()
+  if CEF.UIFilters and CEF.UIFilters.syncFilterDropBlocker then
+    CEF.UIFilters.syncFilterDropBlocker(f)
+  end
+end
+
+-- ===== Drag & drop de membros entre subgrupos (só raid, líder/assistente) =====
+
+local drag = {
+  pending = false, -- botão pressionado, aguardando ultrapassar o limiar
+  active = false, -- ghost visível, a arrastar de facto
+  memberName = nil,
+  startX = 0,
+  startY = 0,
+  hoverRf = nil,
+}
+
+local DRAG_THRESHOLD = 6
+local EDGE_BAND = 26
+local EDGE_STEP = 7
+
+local function cursorUiXY()
+  local scale = UIParent:GetEffectiveScale() or 1
+  if scale < 0.01 then
+    scale = 1
+  end
+  local cx, cy = GetCursorPosition()
+  return cx / scale, cy / scale
+end
+
+local function findMemberByName(name)
+  if not name then
+    return nil
+  end
+  for _, m in ipairs(CEF.Group.getMembers() or {}) do
+    if m.name == name then
+      return m
+    end
+  end
+  return nil
+end
+
+local function ensureDragGhost()
+  local ui = CEF.UI or {}
+  if ui.groupDragGhost then
+    return ui.groupDragGhost
+  end
+  local ghost = CreateFrame("Frame", nil, UIParent)
+  ghost:SetSize(180, 24)
+  ghost:SetFrameStrata("TOOLTIP")
+  ghost:SetFrameLevel(600)
+  ghost:EnableMouse(false)
+  ghost:Hide()
+  makeMenuChrome(ghost)
+  local fs = ghost:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  fs:SetPoint("LEFT", ghost, "LEFT", 8, 0)
+  fs:SetPoint("RIGHT", ghost, "RIGHT", -8, 0)
+  fs:SetJustifyH("LEFT")
+  ghost.label = fs
+  CEF.UI.groupDragGhost = ghost
+  return ghost
+end
+
+local function clearDragHover()
+  if drag.hoverRf then
+    applyRowBaseBg(drag.hoverRf)
+    drag.hoverRf = nil
+  end
+end
+
+-- Linha visível sob o cursor (alvo do drop).
+local function rowUnderCursor()
+  local ui = CEF.UI or {}
+  -- Fora da viewport o clipping esconde a linha, mas ela ainda responde ao rato.
+  if not (ui.groupScrollFrame and ui.groupScrollFrame:IsMouseOver()) then
+    return nil
+  end
+  local rowFrames = ui.groupRowFrames or {}
+  for _, rf in ipairs(rowFrames) do
+    if rf:IsShown() and rf:IsMouseOver() then
+      return rf
+    end
+  end
+  return nil
+end
+
+-- Semântica do drop (igual à janela de raide da Blizzard):
+-- alvo com vaga → move; alvo cheio em cima de um membro → troca os dois.
+local function performDrop(targetRf)
+  local src = findMemberByName(drag.memberName)
+  if not src or not targetRf then
+    return
+  end
+  local targetSubgroup, targetMember
+  if targetRf.cefKind == "hdr" then
+    targetSubgroup = targetRf.cefSubgroup
+  elseif targetRf.cefKind == "member" and targetRf.cefMember then
+    targetMember = targetRf.cefMember
+    targetSubgroup = targetMember.subgroup
+  end
+  if not targetSubgroup or targetSubgroup == src.subgroup then
+    return
+  end
+  if CEF.Group.subgroupCount(targetSubgroup) < 5 then
+    local ok, errKey = CEF.Group.moveToSubgroup(src, targetSubgroup)
+    if not ok and errKey then
+      notifyActionError(errKey, targetSubgroup)
+    end
+  elseif targetMember then
+    local ok, errKey = CEF.Group.swapMembers(src, targetMember)
+    if not ok and errKey then
+      notifyActionError(errKey)
+    end
+  else
+    notifyActionError("GROUP_ERR_FULL", targetSubgroup)
+  end
+end
+
+local function stopDrag(doDrop)
+  local ui = CEF.UI or {}
+  local targetRf = doDrop and drag.active and rowUnderCursor() or nil
+  clearDragHover()
+  if ui.groupDragGhost then
+    ui.groupDragGhost:Hide()
+  end
+  if ui.groupDragDriver then
+    ui.groupDragDriver:SetScript("OnUpdate", nil)
+    ui.groupDragDriver:Hide()
+  end
+  local wasActive = drag.active
+  drag.pending = false
+  drag.active = false
+  if wasActive and targetRf then
+    performDrop(targetRf)
+  end
+  drag.memberName = nil
+end
+
+-- Auto-scroll quando o cursor encosta nas bordas da lista durante o drag.
+local function dragAutoScroll()
+  local ui = CEF.UI or {}
+  local scroll = ui.groupScrollFrame
+  local child = ui.groupScrollChild
+  if not scroll or not child or not scroll:IsShown() then
+    return
+  end
+  local _, cy = cursorUiXY()
+  local top = scroll:GetTop()
+  local bottom = scroll:GetBottom()
+  if not top or not bottom then
+    return
+  end
+  local vs = scroll:GetVerticalScroll() or 0
+  local maxS = math.max(0, (child:GetHeight() or 0) - (scroll:GetHeight() or 1))
+  local newVs = vs
+  if cy > top - EDGE_BAND and cy < top + EDGE_BAND then
+    newVs = math.max(0, vs - EDGE_STEP)
+  elseif cy < bottom + EDGE_BAND and cy > bottom - EDGE_BAND then
+    newVs = math.min(maxS, vs + EDGE_STEP)
+  end
+  if newVs ~= vs then
+    scroll:SetVerticalScroll(newVs)
+    GUI.layoutRows()
+    -- O re-layout troca o conteúdo das linhas; força recalcular o realce.
+    drag.hoverRf = nil
+    local f = CEF.UI.mainFrame
+    if f and f.cefSyncGroupScroll then
+      f.cefSyncGroupScroll()
+    end
+  end
+end
+
+local function dragOnUpdate()
+  if not IsMouseButtonDown("LeftButton") then
+    stopDrag(true)
+    return
+  end
+  local x, y = cursorUiXY()
+  if drag.pending and not drag.active then
+    local dx = x - drag.startX
+    local dy = y - drag.startY
+    if (dx * dx + dy * dy) < (DRAG_THRESHOLD * DRAG_THRESHOLD) then
+      return
+    end
+    drag.active = true
+    local ghost = ensureDragGhost()
+    local m = findMemberByName(drag.memberName)
+    ghost.label:SetText(m and CEF.Group.nameRichText(m) or drag.memberName or "")
+    ghost:Show()
+  end
+  if not drag.active then
+    return
+  end
+  local ghost = ensureDragGhost()
+  ghost:ClearAllPoints()
+  ghost:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x + 14, y - 10)
+  dragAutoScroll()
+  -- Realce da linha alvo sob o cursor.
+  local rf = rowUnderCursor()
+  if rf ~= drag.hoverRf then
+    clearDragHover()
+    if rf then
+      local src = findMemberByName(drag.memberName)
+      local sameRow = rf.cefKind == "member" and rf.cefMember and src and rf.cefMember.name == src.name
+      if not sameRow then
+        drag.hoverRf = rf
+      end
+    end
+  end
+  -- Reaplica a cada frame: um refresh do roster no meio do arrasto reseta o fundo.
+  if drag.hoverRf then
+    drag.hoverRf.bg:SetColorTexture(0.3, 0.24, 0.1, 1)
+  end
+end
+
+local function startDragTracking(member)
+  local ui = CEF.UI or {}
+  if not ui.groupDragDriver then
+    local driver = CreateFrame("Frame", nil, UIParent)
+    driver:Hide()
+    CEF.UI.groupDragDriver = driver
+  end
+  drag.pending = true
+  drag.active = false
+  drag.memberName = member.name
+  drag.startX, drag.startY = cursorUiXY()
+  drag.hoverRf = nil
+  local driver = CEF.UI.groupDragDriver
+  driver:Show()
+  driver:SetScript("OnUpdate", dragOnUpdate)
+end
+
+-- ===== Rato nas linhas: hover, clique direito (menu) e arrasto (esquerdo) =====
+
+local function bindGroupRowMouse(rf)
+  if rf.cefMouseBound then
+    return
+  end
+  rf.cefMouseBound = true
+  rf:EnableMouse(true)
+  rf:SetScript("OnEnter", function(self)
+    if drag.active or self.cefKind ~= "member" then
+      return
+    end
+    if self.bg then
+      self.bg:SetColorTexture(0.14, 0.12, 0.1, 0.95)
+    end
+  end)
+  rf:SetScript("OnLeave", function(self)
+    if drag.active then
+      return
+    end
+    applyRowBaseBg(self)
+  end)
+  rf:SetScript("OnMouseDown", function(self, button)
+    if button ~= "LeftButton" or self.cefKind ~= "member" or not self.cefMember then
+      return
+    end
+    if not (CEF.Group.canEditRaid and CEF.Group.canEditRaid()) then
+      return
+    end
+    startDragTracking(self.cefMember)
+  end)
+  rf:SetScript("OnMouseUp", function(self, button)
+    if button ~= "RightButton" then
+      return
+    end
+    if drag.pending or drag.active then
+      stopDrag(false)
+      return
+    end
+    if self.cefKind == "member" and self.cefMember then
+      GUI.showMemberContextMenu(self.cefMember)
+    end
+  end)
 end
 
 function GUI.updateEmptyState()
@@ -182,6 +735,7 @@ function GUI.layoutRows()
       sep:SetPoint("BOTTOMLEFT", rf, "BOTTOMLEFT", 4, 0)
       sep:SetPoint("BOTTOMRIGHT", rf, "BOTTOMRIGHT", -4, 0)
       rf.rowBotSep = sep
+      bindGroupRowMouse(rf)
       rowFrames[rowIndex] = rf
     end
 
@@ -206,7 +760,11 @@ function GUI.layoutRows()
 
     if item.kind == "hdr" then
       -- Cabeçalho de subgrupo (raide): faixa própria, sem colunas.
-      rf.bg:SetColorTexture(0.16, 0.13, 0.08, 0.98)
+      rf.cefKind = "hdr"
+      rf.cefSubgroup = item.subgroup
+      rf.cefMember = nil
+      rf.cefEven = false
+      applyRowBaseBg(rf)
       rf.cols[1]:ClearAllPoints()
       rf.cols[1]:SetPoint("LEFT", rf, "LEFT", xs[1], 0)
       rf.cols[1]:SetWidth(math.max(120, (widths[1] or 120) + (widths[2] or 0)))
@@ -214,11 +772,11 @@ function GUI.layoutRows()
       rf.classIcon:Hide()
     else
       local m = item.member
-      if (i % 2) == 0 then
-        rf.bg:SetColorTexture(0.1, 0.1, 0.12, 0.85)
-      else
-        rf.bg:SetColorTexture(0.08, 0.08, 0.1, 0.85)
-      end
+      rf.cefKind = "member"
+      rf.cefSubgroup = m.subgroup
+      rf.cefMember = m
+      rf.cefEven = ((i % 2) == 0)
+      applyRowBaseBg(rf)
 
       rf.cols[1]:SetText(CEF.Group.nameRichText(m))
       if CEF.Guild and CEF.Guild.levelColorRichText then

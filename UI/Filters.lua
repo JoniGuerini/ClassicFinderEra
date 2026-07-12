@@ -18,7 +18,8 @@ local function anyFilterMenuShown(mainFrame)
   local g = mainFrame.filterGuildOnlineMenu and mainFrame.filterGuildOnlineMenu:IsShown()
   local h = mainFrame.guildMemberContextMenu and mainFrame.guildMemberContextMenu:IsShown()
   local i = mainFrame.filterLocaleMenu and mainFrame.filterLocaleMenu:IsShown()
-  return a or b or c or d or e or g or h or i
+  local j = mainFrame.groupMemberContextMenu and mainFrame.groupMemberContextMenu:IsShown()
+  return a or b or c or d or e or g or h or i or j
 end
 
 function UI.anyFilterMenuShown(mainFrame)
@@ -84,6 +85,12 @@ function UI.hideAllFilterDropdowns(mainFrame)
   end
   if mainFrame and mainFrame.cefGuildContextOutsideCloser then
     mainFrame.cefGuildContextOutsideCloser:Hide()
+  end
+  if mainFrame and mainFrame.groupMemberContextMenu then
+    mainFrame.groupMemberContextMenu:Hide()
+  end
+  if mainFrame and mainFrame.cefGroupContextOutsideCloser then
+    mainFrame.cefGroupContextOutsideCloser:Hide()
   end
   if mainFrame and mainFrame.filterLocaleMenu then
     mainFrame.filterLocaleMenu:Hide()
