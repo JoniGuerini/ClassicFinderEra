@@ -1,4 +1,4 @@
--- Módulo: agregação da aba Home — demanda Chat + Premade (instâncias, funções).
+-- Módulo: agregação da aba Home — demanda Chat + Premade (instâncias com funções).
 
 ClassicEraFinder = ClassicEraFinder or {}
 local CEF = ClassicEraFinder
@@ -6,19 +6,41 @@ local CEF = ClassicEraFinder
 CEF.Home = CEF.Home or {}
 local Home = CEF.Home
 
-local TOP_INSTANCES = 10
-
-local function bump(map, key, n)
-  if not key or key == "" then
-    return
-  end
-  map[key] = (map[key] or 0) + (n or 1)
-end
+local TOP_PER_CATEGORY = 10
 
 local function normalizeLabel(s)
   s = tostring(s or "")
   s = s:gsub("^%s+", ""):gsub("%s+$", "")
   return s
+end
+
+local function ensureInstRow(map, label, instanceKey)
+  local row = map[label]
+  if not row then
+    row = {
+      label = label,
+      instanceKey = instanceKey,
+      chat = 0,
+      lfg = 0,
+      total = 0,
+      tank = 0,
+      heal = 0,
+      dps = 0,
+      maxNumPlayers = 0,
+    }
+    map[label] = row
+  elseif instanceKey and not row.instanceKey then
+    row.instanceKey = instanceKey
+  end
+  return row
+end
+
+local function rowIsRaid(row)
+  if row.instanceKey and CEF.instanceKeyIsRaid and CEF.instanceKeyIsRaid(row.instanceKey) then
+    return true
+  end
+  local mp = tonumber(row.maxNumPlayers) or 0
+  return mp > 5
 end
 
 local function lfgOpenRoles(result)
@@ -60,24 +82,22 @@ local function lfgOpenRoles(result)
   return open
 end
 
-local function roleLabel(roleKey)
-  if roleKey == "tank" then
-    return (CEF.L and CEF.L.FILTER_ROLE_TANK) or "Tank"
+local function sortAndTrim(list, limit)
+  table.sort(list, function(a, b)
+    if a.total ~= b.total then
+      return a.total > b.total
+    end
+    return a.label < b.label
+  end)
+  while #list > limit do
+    list[#list] = nil
   end
-  if roleKey == "heal" then
-    return (CEF.L and CEF.L.FILTER_ROLE_HEAL) or "Healer"
-  end
-  if roleKey == "dps" then
-    return (CEF.L and CEF.L.FILTER_ROLE_DPS) or "DPS"
-  end
-  return roleKey
+  return list
 end
 
 --- Snapshot ao vivo para a aba Home.
 function Home.buildSnapshot()
-  local instanceChat, instanceLfg = {}, {}
-  local roleChat = { tank = 0, heal = 0, dps = 0 }
-  local roleLfg = { tank = 0, heal = 0, dps = 0 }
+  local merged = {}
   local intent = { invite = 0, whisper = 0 }
   local chatCount, lfgCount = 0, 0
 
@@ -99,17 +119,27 @@ function Home.buildSnapshot()
         instList = {}
       end
     end
+
+    local labels = {}
     for _, ik in ipairs(instList) do
       local label = (CEF.getInstanceDisplayName and CEF.getInstanceDisplayName(ik)) or ik
       label = normalizeLabel(label)
       if label ~= "" then
-        bump(instanceChat, label)
+        local row = ensureInstRow(merged, label, ik)
+        row.chat = row.chat + 1
+        row.total = row.chat + row.lfg
+        labels[#labels + 1] = label
       end
     end
 
-    for _, rk in ipairs({ "tank", "heal", "dps" }) do
-      if CEF.messageMatchesRoleFilter and CEF.messageMatchesRoleFilter(e.text, rk) then
-        roleChat[rk] = roleChat[rk] + 1
+    if #labels > 0 then
+      for _, rk in ipairs({ "tank", "heal", "dps" }) do
+        if CEF.messageMatchesRoleFilter and CEF.messageMatchesRoleFilter(e.text, rk) then
+          for _, label in ipairs(labels) do
+            local row = merged[label]
+            row[rk] = (row[rk] or 0) + 1
+          end
+        end
       end
     end
   end
@@ -117,64 +147,75 @@ function Home.buildSnapshot()
   local results = (CEF.LFG and CEF.LFG.getResults and CEF.LFG.getResults()) or {}
   for _, r in ipairs(results) do
     lfgCount = lfgCount + 1
-    local label = normalizeLabel(r.activityName)
-    if label ~= "" and label ~= "—" then
-      bump(instanceLfg, label)
-    end
     local open = lfgOpenRoles(r)
-    roleLfg.tank = roleLfg.tank + open.tank
-    roleLfg.heal = roleLfg.heal + open.heal
-    roleLfg.dps = roleLfg.dps + open.dps
-  end
+    local mp = tonumber(r.roleDisplay and r.roleDisplay.maxNumPlayers)
+      or tonumber(r.maxNumPlayers)
+      or 0
 
-  local mergedInstances = {}
-  for label, n in pairs(instanceChat) do
-    local row = mergedInstances[label] or { label = label, chat = 0, lfg = 0, total = 0 }
-    row.chat = n
-    row.total = row.chat + row.lfg
-    mergedInstances[label] = row
-  end
-  for label, n in pairs(instanceLfg) do
-    local row = mergedInstances[label] or { label = label, chat = 0, lfg = 0, total = 0 }
-    row.lfg = n
-    row.total = row.chat + row.lfg
-    mergedInstances[label] = row
-  end
-  local instances = {}
-  for _, row in pairs(mergedInstances) do
-    instances[#instances + 1] = row
-  end
-  table.sort(instances, function(a, b)
-    if a.total ~= b.total then
-      return a.total > b.total
+    local entries = r.instanceEntries
+    if type(entries) ~= "table" or #entries == 0 then
+      local label = normalizeLabel(r.activityName)
+      if label ~= "" and label ~= "—" then
+        local instKey = nil
+        if CEF.resolveInstanceKeyFromName then
+          instKey = CEF.resolveInstanceKeyFromName(r.activityName)
+        end
+        entries = { { key = instKey, name = label, maxNumPlayers = mp } }
+      else
+        entries = {}
+      end
     end
-    return a.label < b.label
-  end)
-  while #instances > TOP_INSTANCES do
-    instances[#instances] = nil
+
+    for _, ie in ipairs(entries) do
+      local instKey = ie.key
+      local label
+      if instKey and CEF.getInstanceDisplayName then
+        label = normalizeLabel(CEF.getInstanceDisplayName(instKey))
+      else
+        label = normalizeLabel(ie.name or "")
+      end
+      if label ~= "" and label ~= "—" then
+        local row = ensureInstRow(merged, label, instKey)
+        row.lfg = row.lfg + 1
+        row.total = row.chat + row.lfg
+        local ieMp = tonumber(ie.maxNumPlayers) or mp
+        if ieMp > (row.maxNumPlayers or 0) then
+          row.maxNumPlayers = ieMp
+        end
+        row.tank = row.tank + open.tank
+        row.heal = row.heal + open.heal
+        row.dps = row.dps + open.dps
+      end
+    end
   end
 
-  local roles = {}
-  for _, rk in ipairs({ "tank", "heal", "dps" }) do
-    local chatN = roleChat[rk] or 0
-    local lfgN = roleLfg[rk] or 0
-    roles[#roles + 1] = {
-      key = rk,
-      label = roleLabel(rk),
-      chat = chatN,
-      lfg = lfgN,
-      total = chatN + lfgN,
-    }
+  local dungeons, raids = {}, {}
+  for _, row in pairs(merged) do
+    if rowIsRaid(row) then
+      raids[#raids + 1] = row
+    else
+      dungeons[#dungeons + 1] = row
+    end
   end
-  table.sort(roles, function(a, b)
-    return a.total > b.total
-  end)
+  sortAndTrim(dungeons, TOP_PER_CATEGORY)
+  sortAndTrim(raids, TOP_PER_CATEGORY)
 
   return {
     chatCount = chatCount,
     lfgCount = lfgCount,
     intent = intent,
-    instances = instances,
-    roles = roles,
+    dungeons = dungeons,
+    raids = raids,
+    -- Compat: lista unificada (masmorras primeiro, depois raids).
+    instances = (function()
+      local all = {}
+      for _, row in ipairs(dungeons) do
+        all[#all + 1] = row
+      end
+      for _, row in ipairs(raids) do
+        all[#all + 1] = row
+      end
+      return all
+    end)(),
   }
 end

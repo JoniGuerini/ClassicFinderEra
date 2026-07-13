@@ -26,6 +26,16 @@ function UIE.layoutRows()
   CEF.Entries.rebuildFilteredView()
   local filteredView = CEF.Entries.getFilteredView()
   local n = #filteredView
+  local allEntries = CEF.Entries.getAll and CEF.Entries.getAll()
+  local allN = (type(allEntries) == "table" and #allEntries) or n
+  local footFs = ui.listFooterLabel
+  if footFs and CEF.L then
+    if n ~= allN then
+      footFs:SetText(CEF.L("LFG_RESULT_COUNT_FILTERED", n, allN))
+    else
+      footFs:SetText(CEF.L("LFG_RESULT_COUNT", n))
+    end
+  end
   if n < 0 then
     return
   end

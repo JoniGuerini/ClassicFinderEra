@@ -7,7 +7,9 @@ CEF.LFGUI = CEF.LFGUI or {}
 local GUI = CEF.LFGUI
 
 local ROW_H = 36
-local POOL = 22
+local ROW_LINE = 14
+local ROW_EDGE = 4
+local POOL = 28
 local ROLE_ICON = 15
 local ROLE_GAP = 1
 local TABLE_PAD = 10
@@ -169,6 +171,23 @@ local function paintRoles(rf, row, x, w)
   end
 end
 
+local function activityLineCount(row)
+  local n = tonumber(row and row.activityLineCount) or 0
+  if n < 1 then
+    n = 1
+  end
+  return math.min(5, n)
+end
+
+-- Altura estilo Chat: "\n\n" entre instâncias → (2*n - 1) linhas visuais.
+local function rowHeightFor(row)
+  local n = activityLineCount(row)
+  if n <= 1 then
+    return ROW_H
+  end
+  return math.max(ROW_H, (2 * n - 1) * ROW_LINE + ROW_EDGE)
+end
+
 local function statusText()
   if not (CEF.LFG and CEF.LFG.isAvailable and CEF.LFG.isAvailable()) then
     return CEF.L.LFG_UNAVAILABLE
@@ -222,8 +241,17 @@ function GUI.refresh()
 
   local childW = listScroll:GetWidth() or 600
   listChild:SetWidth(childW)
-  local totalH = math.max(1, #results * ROW_H)
-  listChild:SetHeight(totalH)
+
+  local rowHeights, rowStarts = {}, {}
+  local totalH = 0
+  for idx = 1, #results do
+    local h = rowHeightFor(results[idx])
+    rowHeights[idx] = h
+    rowStarts[idx] = totalH
+    totalH = totalH + h
+  end
+  listChild:SetHeight(math.max(1, totalH))
+
   local viewH = listScroll:GetHeight() or 1
   local vs = listScroll:GetVerticalScroll() or 0
   local maxScroll = math.max(0, totalH - viewH)
@@ -233,11 +261,21 @@ function GUI.refresh()
   end
 
   local first = 1
-  if totalH > 0 then
-    first = math.floor(vs / ROW_H) + 1
+  for idx = 1, #results do
+    if (rowStarts[idx] + rowHeights[idx]) > vs then
+      first = idx
+      break
+    end
   end
-  local visible = math.ceil(viewH / ROW_H) + 2
-  local last = math.min(#results, first + visible - 1)
+  local last = first
+  local bottom = vs + viewH
+  for idx = first, #results do
+    last = idx
+    if rowStarts[idx] > bottom then
+      break
+    end
+  end
+  last = math.min(#results, last + 1)
 
   for _, rf in ipairs(rows) do
     rf:Hide()
@@ -263,8 +301,14 @@ function GUI.refresh()
       rf.bg = bg
       rf.colAct = rf:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
       rf.colAct:SetJustifyH("LEFT")
-      rf.colAct:SetJustifyV("MIDDLE")
-      rf.colAct:SetWordWrap(false)
+      rf.colAct:SetJustifyV("TOP")
+      -- Word wrap ligado: sem ele o FontString ignora os "\n" e mostra tudo numa linha.
+      rf.colAct:SetWordWrap(true)
+      rf.colAct:SetNonSpaceWrap(false)
+      if rf.colAct.SetMaxLines then
+        -- 5 instâncias × "\n\n" entre elas = até 9 linhas visuais.
+        rf.colAct:SetMaxLines(9)
+      end
       rf.colLeader = rf:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
       rf.colLeader:SetJustifyH("LEFT")
       rf.colLeader:SetJustifyV("MIDDLE")
@@ -300,9 +344,11 @@ function GUI.refresh()
     end
 
     local row = results[i]
+    local rh = rowHeights[i] or ROW_H
     rf:SetWidth(childW)
+    rf:SetHeight(rh)
     rf:ClearAllPoints()
-    rf:SetPoint("TOPLEFT", listChild, "TOPLEFT", 0, -((i - 1) * ROW_H))
+    rf:SetPoint("TOPLEFT", listChild, "TOPLEFT", 0, -(rowStarts[i] or 0))
     if (i % 2 == 0) then
       rf.bg:SetColorTexture(0.1, 0.1, 0.12, 0.85)
     else
@@ -310,12 +356,16 @@ function GUI.refresh()
     end
 
     rf.colAct:ClearAllPoints()
-    rf.colAct:SetPoint("LEFT", rf, "LEFT", x1, 0)
+    rf.colAct:SetPoint("TOPLEFT", rf, "TOPLEFT", x1, -2)
     rf.colAct:SetWidth(w1)
-    rf.colAct:SetText(row.activityName ~= "" and row.activityName or "—")
+    rf.colAct:SetHeight(math.max(ROW_LINE, rh - 4))
+    rf.colAct:SetJustifyV("TOP")
+    rf.colAct:SetText(row.activityRichText or row.activityName or "—")
+    -- Cores vêm do rich text (|c…|r); evita sobrescrever com branco.
+    rf.colAct:SetTextColor(1, 1, 1)
 
     rf.colLeader:ClearAllPoints()
-    rf.colLeader:SetPoint("LEFT", rf, "LEFT", x2, 4)
+    rf.colLeader:SetPoint("LEFT", rf, "LEFT", x2, 6)
     rf.colLeader:SetWidth(w2)
     rf.colLeader:SetText(row.leaderName or "?")
     local classFile = row.leaderClass
@@ -497,8 +547,43 @@ function GUI.createPanels(f, navBar)
   actMenuBg:SetColorTexture(0.08, 0.07, 0.07, 0.98)
   f.lfgActivityMenu = actMenu
 
+  local ACT_MENU_SEARCH_H = 22
+  local actMenuSearchQ = ""
+  local actSearchBorder = CreateFrame("Frame", nil, actMenu)
+  actSearchBorder:SetHeight(ACT_MENU_SEARCH_H)
+  actSearchBorder:SetPoint("TOPLEFT", actMenu, "TOPLEFT", 6, -6)
+  actSearchBorder:SetPoint("TOPRIGHT", actMenu, "TOPRIGHT", -6, -6)
+  local actSearchBg = actSearchBorder:CreateTexture(nil, "BACKGROUND")
+  actSearchBg:SetAllPoints()
+  actSearchBg:SetColorTexture(0.1, 0.09, 0.08, 1)
+  local actSearchPh = actSearchBorder:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+  actSearchPh:SetPoint("LEFT", actSearchBorder, "LEFT", 6, 0)
+  actSearchPh:SetPoint("RIGHT", actSearchBorder, "RIGHT", -6, 0)
+  actSearchPh:SetJustifyH("LEFT")
+  actSearchPh:SetText(CEF.L.FILTER_INSTANCE_SEARCH or "Search instance…")
+  local actSearchEdit = CreateFrame("EditBox", nil, actSearchBorder)
+  actSearchEdit:SetFontObject(GameFontHighlightSmall)
+  actSearchEdit:SetPoint("TOPLEFT", actSearchBorder, "TOPLEFT", 4, -2)
+  actSearchEdit:SetPoint("BOTTOMRIGHT", actSearchBorder, "BOTTOMRIGHT", -4, 2)
+  actSearchEdit:SetAutoFocus(false)
+  actSearchEdit:SetScript("OnEscapePressed", function(self)
+    self:ClearFocus()
+  end)
+  local function updateActSearchPh()
+    local tx = actSearchEdit:GetText() or ""
+    if tx == "" and not actSearchEdit:HasFocus() then
+      actSearchPh:Show()
+    else
+      actSearchPh:Hide()
+    end
+  end
+  actSearchEdit:SetScript("OnEditFocusGained", updateActSearchPh)
+  actSearchEdit:SetScript("OnEditFocusLost", updateActSearchPh)
+  f.lfgActivitySearchEdit = actSearchEdit
+  f.lfgActivitySearchPlaceholder = actSearchPh
+
   local actScroll = CreateFrame("ScrollFrame", nil, actMenu)
-  actScroll:SetPoint("TOPLEFT", actMenu, "TOPLEFT", 4, -4)
+  actScroll:SetPoint("TOPLEFT", actMenu, "TOPLEFT", 4, -(8 + ACT_MENU_SEARCH_H))
   actScroll:SetPoint("BOTTOMRIGHT", actMenu, "BOTTOMRIGHT", -4, 4)
   actScroll:EnableMouseWheel(true)
   local actChild = CreateFrame("Frame", nil, actScroll)
@@ -585,7 +670,30 @@ function GUI.createPanels(f, navBar)
 
   local function openActMenu()
     hideCatMenu()
-    local activities = (CEF.LFG and CEF.LFG.getActivities and CEF.LFG.getActivities()) or {}
+    local allActivities = (CEF.LFG and CEF.LFG.getActivities and CEF.LFG.getActivities()) or {}
+    local q = actMenuSearchQ
+    local activities = allActivities
+    if q ~= "" then
+      activities = {}
+      for _, act in ipairs(allActivities) do
+        local hay = tostring(act.label or act.name or "")
+        hay = hay:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+        hay = strlower(hay)
+        if act.instanceKey then
+          if CEF.instanceSearchHay then
+            hay = hay .. " " .. CEF.instanceSearchHay(act.instanceKey)
+          else
+            hay = hay .. " " .. strlower(tostring(act.instanceKey))
+            if CEF.getInstanceDisplayName then
+              hay = hay .. " " .. strlower(tostring(CEF.getInstanceDisplayName(act.instanceKey) or ""))
+            end
+          end
+        end
+        if hay:find(q, 1, true) then
+          activities[#activities + 1] = act
+        end
+      end
+    end
     local rows = f.lfgActivityMenuRows
     for _, r in ipairs(rows) do
       r:Hide()
@@ -597,6 +705,7 @@ function GUI.createPanels(f, navBar)
     allRow:SetPoint("TOPLEFT", actChild, "TOPLEFT", 0, 0)
     allRow:SetPoint("TOPRIGHT", actChild, "TOPRIGHT", 0, 0)
     allRow.fs:SetText(CEF.L.LFG_ALL_ACTIVITIES)
+    local myLevelOn = CEF.LFG.isMyLevelFilter and CEF.LFG.isMyLevelFilter()
     local allSelected = not (CEF.LFG.hasActivityFilter and CEF.LFG.hasActivityFilter())
     if CEF.UIFilters and CEF.UIFilters.setFilterRowChecked then
       CEF.UIFilters.setFilterRowChecked(allRow, allSelected, true)
@@ -610,20 +719,121 @@ function GUI.createPanels(f, navBar)
       end
       refreshActivityLabel()
       hideActMenu()
-      if CEF.LFG.search then
-        CEF.LFG.search()
-      end
+      -- Filtro só no cliente; evita Search a cada clique (lento / pode travar).
       GUI.refresh()
     end)
     allRow:Show()
 
-    local h = 22
-    for i, act in ipairs(activities) do
-      local row = ensureActRow(i + 1)
+    -- Linha 2: Instâncias para o meu personagem (range recomendado)
+    local myRow = ensureActRow(2)
+    myRow:ClearAllPoints()
+    myRow:SetPoint("TOPLEFT", actChild, "TOPLEFT", 0, -22)
+    myRow:SetPoint("TOPRIGHT", actChild, "TOPRIGHT", 0, -22)
+    myRow.fs:SetText(CEF.L.FILTER_MY_LEVEL_INSTANCES or "Instances for my character")
+    if CEF.UIFilters and CEF.UIFilters.setFilterRowChecked then
+      CEF.UIFilters.setFilterRowChecked(myRow, myLevelOn, true)
+      CEF.UIFilters.applyFilterRowBg(myRow, false)
+    else
+      myRow.bg:SetColorTexture(myLevelOn and 0.2 or 0.12, myLevelOn and 0.26 or 0.11, myLevelOn and 0.14 or 0.1, 1)
+    end
+    myRow:SetScript("OnClick", function()
+      if CEF.LFG.toggleMyLevelFilter then
+        CEF.LFG.toggleMyLevelFilter()
+      end
+      refreshActivityLabel()
+      openActMenu()
+      if CEF.UIFilters and CEF.UIFilters.setDropChevronOpen then
+        CEF.UIFilters.setDropChevronOpen(actBtn, true)
+      end
+      GUI.refresh()
+    end)
+    myRow:Show()
+
+    local splitTbc = CEF.isTbcActive and CEF.isTbcActive()
+    local catId = CEF.LFG.getSelectedCategoryId and CEF.LFG.getSelectedCategoryId()
+    local catLocaleKey = nil
+    if CEF.LFG and CEF.LFG.getCategoryLocaleKey then
+      catLocaleKey = CEF.LFG.getCategoryLocaleKey(catId)
+    end
+    local isRaidCat = catLocaleKey == "CATEGORY_RAIDS"
+    local isDungeonCat = catLocaleKey == "CATEGORY_DUNGEONS"
+    local canSplit = splitTbc and (isRaidCat or isDungeonCat or catLocaleKey == nil)
+
+    local h = 44
+    local rowIndex = 2
+    local lastBucket = nil
+    local sawClassic, sawTbc, sawHeroic = false, false, false
+    for _, act in ipairs(activities) do
+      if act.isTbcHeroic then
+        sawHeroic = true
+      elseif act.isTbc then
+        sawTbc = true
+      else
+        sawClassic = true
+      end
+    end
+    canSplit = canSplit and ((sawClassic and (sawTbc or sawHeroic)) or (sawTbc and sawHeroic))
+
+    local function headerForBucket(bucket)
+      if isRaidCat then
+        if bucket == "tbc" or bucket == "tbcHeroic" then
+          return "CATEGORY_TBC_RAIDS"
+        end
+        return "CATEGORY_CLASSIC_RAIDS"
+      end
+      if bucket == "tbcHeroic" then
+        return "CATEGORY_TBC_HEROIC_DUNGEONS"
+      end
+      if bucket == "tbc" then
+        return "CATEGORY_TBC_DUNGEONS"
+      end
+      return "CATEGORY_CLASSIC_DUNGEONS"
+    end
+
+    local function actBucket(act)
+      if act.isTbcHeroic then
+        return "tbcHeroic"
+      end
+      if act.isTbc then
+        return "tbc"
+      end
+      return "classic"
+    end
+
+    local function pushHeader(textKey)
+      rowIndex = rowIndex + 1
+      local row = ensureActRow(rowIndex)
+      row:ClearAllPoints()
+      row:SetPoint("TOPLEFT", actChild, "TOPLEFT", 0, -h)
+      row:SetPoint("TOPRIGHT", actChild, "TOPRIGHT", 0, -h)
+      row.fs:SetText((textKey and CEF.L[textKey]) or textKey or "")
+      row.fs:SetTextColor(1, 0.82, 0.18)
+      row:EnableMouse(false)
+      if CEF.UIFilters and CEF.UIFilters.setFilterRowChecked then
+        CEF.UIFilters.setFilterRowChecked(row, false, false)
+        CEF.UIFilters.applyFilterRowBg(row, false)
+      else
+        row.bg:SetColorTexture(0.1, 0.09, 0.08, 1)
+      end
+      row:SetScript("OnClick", nil)
+      row:Show()
+      h = h + 22
+    end
+
+    for _, act in ipairs(activities) do
+      local bucket = actBucket(act)
+      if canSplit and bucket ~= lastBucket then
+        pushHeader(headerForBucket(bucket))
+        lastBucket = bucket
+      end
+      rowIndex = rowIndex + 1
+      local row = ensureActRow(rowIndex)
       row:ClearAllPoints()
       row:SetPoint("TOPLEFT", actChild, "TOPLEFT", 0, -h)
       row:SetPoint("TOPRIGHT", actChild, "TOPRIGHT", 0, -h)
       row.fs:SetText(act.label or act.name)
+      row.fs:SetTextColor(1, 1, 1)
+      row:EnableMouse(true)
       local checked = CEF.LFG.isActivitySelected and CEF.LFG.isActivitySelected(act.id)
       if CEF.UIFilters and CEF.UIFilters.setFilterRowChecked then
         CEF.UIFilters.setFilterRowChecked(row, checked, true)
@@ -636,13 +846,9 @@ function GUI.createPanels(f, navBar)
           CEF.LFG.toggleActivity(act.id)
         end
         refreshActivityLabel()
-        -- Mantém o menu aberto para multi-select; atualiza checks.
         openActMenu()
         if CEF.UIFilters and CEF.UIFilters.setDropChevronOpen then
           CEF.UIFilters.setDropChevronOpen(actBtn, true)
-        end
-        if CEF.LFG.search then
-          CEF.LFG.search()
         end
         GUI.refresh()
       end)
@@ -650,9 +856,14 @@ function GUI.createPanels(f, navBar)
       h = h + 22
     end
 
+    local rowsAll = f.lfgActivityMenuRows
+    for i = rowIndex + 1, #rowsAll do
+      rowsAll[i]:Hide()
+    end
+
     actChild:SetHeight(math.max(22, h))
     actChild:SetWidth(math.max(ACT_W, (actBtn:GetWidth() or ACT_W) + 20))
-    local menuH = math.min(280, h + 8)
+    local menuH = math.min(300, h + 8 + ACT_MENU_SEARCH_H + 4)
     actMenu:SetHeight(menuH)
     actMenu:SetWidth(math.max(ACT_W + 8, (actBtn:GetWidth() or ACT_W) + 28))
     actMenu:ClearAllPoints()
@@ -660,6 +871,17 @@ function GUI.createPanels(f, navBar)
     actScroll:SetVerticalScroll(0)
     actMenu:Show()
   end
+
+  actSearchEdit:SetScript("OnTextChanged", function(self)
+    local t = self:GetText() or ""
+    t = t:gsub("^%s+", ""):gsub("%s+$", "")
+    actMenuSearchQ = string.lower(t)
+    updateActSearchPh()
+    if actMenu:IsShown() then
+      openActMenu()
+    end
+  end)
+  updateActSearchPh()
 
   local function openCatMenu()
     hideActMenu()
@@ -730,6 +952,9 @@ function GUI.createPanels(f, navBar)
     if actMenu:IsShown() then
       hideActMenu()
     else
+      actMenuSearchQ = ""
+      actSearchEdit:SetText("")
+      updateActSearchPh()
       openActMenu()
       if CEF.UIFilters and CEF.UIFilters.setDropChevronOpen then
         CEF.UIFilters.setDropChevronOpen(actBtn, true)
@@ -751,7 +976,7 @@ function GUI.createPanels(f, navBar)
   refreshBtn:SetScript("OnClick", function()
     hideAllLfgMenus()
     if CEF.LFG and CEF.LFG.search then
-      CEF.LFG.search()
+      CEF.LFG.search(nil, { force = true })
     end
     GUI.refresh()
   end)
@@ -780,7 +1005,7 @@ function GUI.createPanels(f, navBar)
     updateSearchPh()
     refreshActivityLabel()
     if CEF.LFG and CEF.LFG.search then
-      CEF.LFG.search()
+      CEF.LFG.search(nil, { force = true })
     end
     GUI.refresh()
   end)
@@ -1049,6 +1274,9 @@ function GUI.refreshLocale(f)
   end
   if f.lfgSearchPlaceholder then
     f.lfgSearchPlaceholder:SetText(CEF.L.LFG_SEARCH_PLACEHOLDER)
+  end
+  if f.lfgActivitySearchPlaceholder then
+    f.lfgActivitySearchPlaceholder:SetText(CEF.L.FILTER_INSTANCE_SEARCH or "Search instance…")
   end
   if f.lfgRefreshBtn and f.lfgRefreshBtn.fs then
     f.lfgRefreshBtn.fs:SetText(CEF.L.LFG_REFRESH)

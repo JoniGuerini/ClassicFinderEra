@@ -23,7 +23,9 @@ if CEF.state.filterGuildOnlineKey == nil then
   CEF.state.filterGuildOnlineKey = false
 end
 CEF.state.filterGuildLevelMin = CEF.state.filterGuildLevelMin or 1
-CEF.state.filterGuildLevelMax = CEF.state.filterGuildLevelMax or 60
+CEF.state.filterGuildLevelMax = CEF.state.filterGuildLevelMax
+  or (CEF.getMaxPlayerLevel and CEF.getMaxPlayerLevel())
+  or 60
 
 local mainFrame
 local scrollFrame
@@ -240,10 +242,27 @@ eventFrame:RegisterEvent("PLAYER_GUILD_UPDATE")
 eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 eventFrame:RegisterEvent("PARTY_LEADER_CHANGED")
 eventFrame:RegisterEvent("PARTY_LOOT_METHOD_CHANGED")
-eventFrame:RegisterEvent("LFG_LIST_SEARCH_RESULTS_RECEIVED")
-eventFrame:RegisterEvent("LFG_LIST_SEARCH_FAILED")
-eventFrame:RegisterEvent("LFG_LIST_SEARCH_RESULT_UPDATED")
-eventFrame:RegisterEvent("LFG_LIST_AVAILABILITY_UPDATE")
+-- Premade Group Finder: só no cliente que expõe C_LFGList / eventos LFG_LIST_*.
+-- No TBC 2.5.6 RegisterEvent de evento inexistente pode abortar o load.
+do
+  local function canRegisterLfgListEvent(name)
+    if C_EventUtils and C_EventUtils.IsEventValid then
+      return C_EventUtils.IsEventValid(name) == true
+    end
+    return C_LFGList ~= nil
+  end
+  local lfgListEvents = {
+    "LFG_LIST_SEARCH_RESULTS_RECEIVED",
+    "LFG_LIST_SEARCH_FAILED",
+    "LFG_LIST_SEARCH_RESULT_UPDATED",
+    "LFG_LIST_AVAILABILITY_UPDATE",
+  }
+  for _, ev in ipairs(lfgListEvents) do
+    if canRegisterLfgListEvent(ev) then
+      eventFrame:RegisterEvent(ev)
+    end
+  end
+end
 eventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "ADDON_LOADED" then
     if (...) == ADDON_NAME then
@@ -266,11 +285,17 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
       end
     end
   elseif event == "PLAYER_LOGIN" then
-    -- Temporada/realm já disponíveis: reconstrói o menu de instâncias
-    -- (inclui SoD se for o caso) e recarrega listagens no escopo certo
+    -- Temporada/realm/flavor já disponíveis: reconstrói o menu de instâncias
+    -- (SoD / TBC) e recarrega listagens no escopo certo
     -- (ADDON_LOADED pode ter rodado antes de C_Seasons estar pronto).
+    if CEF.invalidateFlavorCaches then
+      CEF.invalidateFlavorCaches()
+    end
     if CEF.rebuildInstanceFilterMenuOpts then
       CEF.rebuildInstanceFilterMenuOpts()
+    end
+    if CEF.clearInstanceDisplayNameCache then
+      CEF.clearInstanceDisplayNameCache()
     end
     if CEF.Entries and CEF.Entries.loadFromDB then
       CEF.Entries.loadFromDB()

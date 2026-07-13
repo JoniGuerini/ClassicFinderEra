@@ -132,6 +132,140 @@ function Entries.rebuildFilteredView()
   end
 end
 
+local function isOwnSender(sender)
+  local me = UnitName and UnitName("player")
+  if not me or me == "" then
+    return false
+  end
+  local a = CEF.stripRealm and CEF.stripRealm(sender) or sender
+  local b = CEF.stripRealm and CEF.stripRealm(me) or me
+  return strlower(tostring(a or "")) == strlower(tostring(b or ""))
+end
+
+function CEF.isChatListingAlertsEnabled()
+  if CEF.DB and CEF.DB.init then
+    CEF.DB.init()
+  end
+  local db = _G.ClassicEraFinderDB
+  if type(db) ~= "table" then
+    return true
+  end
+  return db.chatListingAlerts ~= false
+end
+
+function CEF.setChatListingAlertsEnabled(on)
+  if CEF.DB and CEF.DB.init then
+    CEF.DB.init()
+  end
+  local db = _G.ClassicEraFinderDB
+  if type(db) ~= "table" then
+    return
+  end
+  db.chatListingAlerts = on and true or false
+end
+
+local function truncateAlertText(s, maxLen)
+  s = tostring(s or "")
+  maxLen = maxLen or 72
+  if #s <= maxLen then
+    return s
+  end
+  return s:sub(1, maxLen - 1) .. "..."
+end
+
+-- Evita flood: mesmo jogador+mensagem só volta a imprimir após o cooldown.
+local lastAnnounceAt = {}
+local ANNOUNCE_COOLDOWN_SEC = 90
+
+local function shouldAnnounceKey(key, now)
+  local last = lastAnnounceAt[key]
+  if last and (now - last) < ANNOUNCE_COOLDOWN_SEC then
+    return false
+  end
+  lastAnnounceAt[key] = now
+  return true
+end
+
+local function ensureWhisperLinkHook()
+  if CEF._cefWhisperLinkHooked then
+    return
+  end
+  CEF._cefWhisperLinkHooked = true
+  -- Precisa substituir SetItemRef (não hooksecurefunc): o handler original /
+  -- Questie chama ItemRefTooltip:SetHyperlink e explode em links desconhecidos.
+  local origSetItemRef = SetItemRef
+  SetItemRef = function(link, text, button, chatFrame)
+    if type(link) == "string" then
+      local name = link:match("^cefwhisper:(.+)$")
+      if name then
+        if button and button ~= "LeftButton" then
+          return
+        end
+        name = name:gsub("^%s+", ""):gsub("%s+$", "")
+        if name ~= "" then
+          if ChatFrame_SendTell then
+            ChatFrame_SendTell(name, chatFrame or DEFAULT_CHAT_FRAME)
+          elseif ChatFrame_OpenChat then
+            ChatFrame_OpenChat("/w " .. name .. " ", chatFrame or DEFAULT_CHAT_FRAME)
+          end
+        end
+        return
+      end
+    end
+    return origSetItemRef(link, text, button, chatFrame)
+  end
+end
+
+--- Imprime no chat do jogo uma listagem do Chat, se a opção estiver ligada.
+--- Só anuncia instâncias no range de nível do personagem (mesmo critério do
+--- filtro "Instâncias para o meu personagem").
+function CEF.announceNewChatListing(entry)
+  if not entry or not CEF.isChatListingAlertsEnabled() then
+    return
+  end
+  if isOwnSender(entry.sender) then
+    return
+  end
+  if CEF.entryMatchesPlayerLevelInstances then
+    if not CEF.entryMatchesPlayerLevelInstances(entry) then
+      return
+    end
+  end
+  ensureWhisperLinkHook()
+  local ok, err = pcall(function()
+    local inst = "—"
+    if CEF.entryInstancesComboRichTextInline then
+      inst = CEF.entryInstancesComboRichTextInline(entry) or inst
+    elseif entry.instance and entry.instance ~= "—" and CEF.getInstanceDisplayName then
+      inst = CEF.getInstanceDisplayName(entry.instance)
+    end
+    local name = CEF.stripRealm and CEF.stripRealm(entry.sender or "") or (entry.sender or "?")
+    name = tostring(name or "?")
+    local linkName = name:gsub("|", ""):gsub(":", "")
+    local nameColor = "|cffffffff"
+    if CEF.UIUtils and CEF.UIUtils.classColorRichPrefix then
+      nameColor = CEF.UIUtils.classColorRichPrefix(entry.guid) or nameColor
+    end
+    local msg = truncateAlertText(entry.text, 72)
+    -- Nome clicável → abre whisper (link custom cefwhisper).
+    local nameLink = "|Hcefwhisper:" .. linkName .. "|h" .. nameColor .. name .. "|r|h"
+    local line = tostring(inst)
+      .. " |cff888888—|r "
+      .. nameLink
+      .. ": |cffffffff"
+      .. tostring(msg)
+      .. "|r"
+    if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+      DEFAULT_CHAT_FRAME:AddMessage(line)
+    else
+      print(line)
+    end
+  end)
+  if not ok and DEFAULT_CHAT_FRAME then
+    DEFAULT_CHAT_FRAME:AddMessage("|cffff6666CEF alert:|r " .. tostring(err))
+  end
+end
+
 function Entries.upsertEntry(sender, guid, text, channelLabel)
   if not CEF.messageLooksLFG(text) then
     return
@@ -159,8 +293,16 @@ function Entries.upsertEntry(sender, guid, text, channelLabel)
     existing.instances = instList
     existing.instance = inst
     existing.text = text
+    if guid and guid ~= "" then
+      existing.guid = guid
+    end
     sortEntries()
     CEF.DB.persistEntries(entries)
+    -- Re-anúncio com cooldown: após /reload a lista já está cheia e a maior
+    -- parte dos posts é “bump” do mesmo anúncio (antes não imprimia nada).
+    if shouldAnnounceKey(key, now) then
+      CEF.announceNewChatListing(existing)
+    end
     return
   end
 
@@ -201,6 +343,9 @@ function Entries.upsertEntry(sender, guid, text, channelLabel)
 
   sortEntries()
   CEF.DB.persistEntries(entries)
+  if shouldAnnounceKey(key, now) then
+    CEF.announceNewChatListing(e)
+  end
 end
 
 function Entries.purgeStaleEntries()

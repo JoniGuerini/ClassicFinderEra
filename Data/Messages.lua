@@ -346,6 +346,47 @@ function CEF.classifyMessageIntent(text)
     if t:find("procuro grupo", 1, true) or t:find("procura grupo", 1, true) or t:find("pf grupo", 1, true) then
       return true
     end
+    -- "DPS LF SFK group", "26 rogue LF SFK or BFD", "Tank LF WC":
+    -- (nível opcional +) função/classe + LF (não LFM) = procura vaga, não monta grupo.
+    -- Nota: padrões Lua não têm '|'; checar cada prefixo em plain text.
+    if not t:find("lfm", 1, true) and not t:find("lf%d+m", 1) then
+      local prefixes = {
+        "tank", "tanks", "heal", "heals", "healer", "healers", "dps", "dd", "dds",
+        "mage", "mages", "lock", "locks", "warlock", "warlocks",
+        "priest", "priests", "pala", "paladin", "paladins",
+        "druid", "druids", "rogue", "rogues", "hunter", "hunters",
+        "sham", "shaman", "shamans", "warrior", "warriors", "war",
+      }
+      -- Remove nível no início: "26 rogue …", "lvl 26 tank …", "level 60 dps …"
+      local seek = t:gsub("^lvl%s*%d+%s+", "", 1):gsub("^level%s+%d+%s+", "", 1):gsub("^%d+%s+", "", 1)
+      for _, prefix in ipairs(prefixes) do
+        local rest = seek:match("^" .. prefix .. "%s+(.+)$")
+        if rest then
+          if rest:find("^lf[%s%d%.%-,!]", 1) or rest == "lf" or rest:find("^lf$", 1) then
+            return true
+          end
+          if rest:find("^looking for ", 1, true) and not rest:find("looking for more", 1, true) then
+            return true
+          end
+          if rest:find("^procuro%s+", 1) or rest:find("^busco%s+", 1) then
+            return true
+          end
+        end
+      end
+    end
+    -- "LF SFK group" / "lf ulda group" (LF + DG + group, sem pedir role)
+    if t:find("^lf%s+%S+.*%sgroup", 1) then
+      local afterLf = t:match("^lf%s+(%S+)")
+      local recruitRoles = {
+        tank = true, tanks = true, heal = true, heals = true, healer = true,
+        dps = true, dd = true, mage = true, lock = true, priest = true,
+        pala = true, paladin = true, druid = true, rogue = true, hunter = true,
+        sham = true, shaman = true, warrior = true, warlock = true,
+      }
+      if afterLf and not recruitRoles[afterLf] then
+        return true
+      end
+    end
     for _, needle in ipairs(LFG_I18N_NEEDLES) do
       if t:find(needle, 1, true) then
         return true

@@ -67,6 +67,10 @@ function CEF.DB.init()
   if db.localeOverride == false or db.localeOverride == "" then
     db.localeOverride = nil
   end
+  -- nil / true = imprimir novas listagens do Chat no chat do jogo; false = off.
+  if db.chatListingAlerts == nil then
+    db.chatListingAlerts = true
+  end
   db.version = db.version or 1
   if (tonumber(db.version) or 1) < 2 then
     db.version = 2

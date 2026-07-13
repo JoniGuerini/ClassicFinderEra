@@ -887,7 +887,8 @@ function GUI.createPanels(f, navBar)
   end
 
   local minBorder, minEdit = makeLvlBox(onlineBtn, st().filterGuildLevelMin or 1)
-  local maxBorder, maxEdit = makeLvlBox(minBorder, st().filterGuildLevelMax or 60)
+  local maxCap = (CEF.getMaxPlayerLevel and CEF.getMaxPlayerLevel()) or 60
+  local maxBorder, maxEdit = makeLvlBox(minBorder, st().filterGuildLevelMax or maxCap)
 
   local lvlDash = guildFilterBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
   lvlDash:SetText("-")
@@ -904,15 +905,17 @@ function GUI.createPanels(f, navBar)
     if n < 1 then
       n = 1
     end
-    if n > 60 then
-      n = 60
+    local cap = (CEF.getMaxPlayerLevel and CEF.getMaxPlayerLevel()) or 60
+    if n > cap then
+      n = cap
     end
     return n
   end
 
   local function applyLevelFilters()
+    local cap = (CEF.getMaxPlayerLevel and CEF.getMaxPlayerLevel()) or 60
     st().filterGuildLevelMin = parseLvl(minEdit, 1)
-    st().filterGuildLevelMax = parseLvl(maxEdit, 60)
+    st().filterGuildLevelMax = parseLvl(maxEdit, cap)
     minEdit:SetText(tostring(st().filterGuildLevelMin))
     maxEdit:SetText(tostring(st().filterGuildLevelMax))
     if CEF.UI.guildScrollFrame then

@@ -17,7 +17,13 @@ CEF.Locale.register("enUS", {
   TAB_LFG = "Premade",
   HOME_SUMMARY_FMT = "Chat %d · Premade %d · Looking for group %d · Recruiting %d",
   HOME_INSTANCES_TITLE = "Top instances",
-  HOME_INSTANCES_SUB = "Mentions in chat + Premade listings",
+  HOME_INSTANCES_SUB = "Bar length = activity · colors = role mix (chat + Premade)",
+  HOME_DUNGEONS_TITLE = "Top dungeons",
+  HOME_RAIDS_TITLE = "Top raids",
+  HOME_EMPTY_DUNGEONS = "No dungeon activity yet.",
+  HOME_EMPTY_RAIDS = "No raid activity yet.",
+  HOME_TIP_ACTIVITY = "Activity",
+  HOME_TIP_NO_ROLES = "No role data for this instance yet.",
   HOME_ROLES_TITLE = "Roles in demand",
   HOME_ROLES_SUB = "Chat asks + open Premade slots",
   HOME_CLASSES_TITLE = "Classes requested",
@@ -47,6 +53,7 @@ CEF.Locale.register("enUS", {
   TAB_TERMS = "Terms",
   RESET = "Reset",
   SEARCH_PLACEHOLDER_LIST = "Search name or instance…",
+  FILTER_INSTANCE_SEARCH = "Search instance…",
   SEARCH_PLACEHOLDER_GUILD = "Search name…",
 
   -- Messages hub
@@ -107,6 +114,11 @@ CEF.Locale.register("enUS", {
   FILTER_N_ROLES = "%d roles",
   CATEGORY_DUNGEONS = "Dungeons",
   CATEGORY_RAIDS = "Raids",
+  CATEGORY_CLASSIC_DUNGEONS = "Classic Dungeons",
+  CATEGORY_CLASSIC_RAIDS = "Classic Raids",
+  CATEGORY_TBC_DUNGEONS = "TBC Dungeons (Normal)",
+  CATEGORY_TBC_HEROIC_DUNGEONS = "TBC Heroic Dungeons",
+  CATEGORY_TBC_RAIDS = "TBC Raids",
   LFG_CAT_QUESTS = "Quests & Zones",
   LFG_CAT_CUSTOM = "Custom",
   LFG_CAT_ARENAS = "Arenas",
@@ -124,6 +136,8 @@ CEF.Locale.register("enUS", {
   TIME_DAYS = "%d d",
 
   -- Minimap
+  CHAT_LISTING_ALERT = "|cffffcc66CEF:|r %s |cff888888—|r |cffffffff%s|r: %s",
+  SETTINGS_CHAT_LISTING_ALERTS = "Print Chat listings for my level range to the game chat",
   MINIMAP_TIP_LEFT = "Left-click: open or close",
   MINIMAP_TIP_RIGHT = "Right-drag: move on minimap",
 

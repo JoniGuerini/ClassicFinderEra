@@ -12,7 +12,14 @@ local searching = false
 local searchFailed = false
 local selectedCategoryId = nil
 local selectedActivityIds = {} -- set { [activityId]=true }; vazio = todas
+local filterMyLevel = false -- só atividades no range recomendado do jogador
 local lastSearchAt = 0
+local pendingSearchCategory = nil
+local searchWatch
+
+-- Se o evento da Blizzard não chegar, não fica preso em "A procurar…".
+local SEARCH_TIMEOUT = 8
+
 
 local EXPECTED_5MAN = {
   TANK = 1,
@@ -211,6 +218,12 @@ local function categoryName(categoryID)
   return CEF.L("LFG_CATEGORY_N", categoryID or 0)
 end
 
+function LFG.getCategoryLocaleKey(categoryID)
+  categoryID = tonumber(categoryID)
+  local blizz = blizzardCategoryName(categoryID)
+  return resolveCategoryLocaleKeyFromName(blizz) or (categoryID and CATEGORY_ID_LOCALE_KEY[categoryID]) or nil
+end
+
 -- Nomes LFG oficiais Blizzard (vários locales) → chave EN do pack de instâncias.
 local ACTIVITY_NAME_ALIASES = {
   ["templo submerso"] = "Sunken Temple",
@@ -219,25 +232,62 @@ local ACTIVITY_NAME_ALIASES = {
   ["temple of atal'hakkar"] = "Sunken Temple",
   ["templo de atal'hakkar"] = "Sunken Temple",
   ["el templo de atal'hakkar"] = "Sunken Temple",
-  ["upper blackrock spire"] = "Blackrock Spire",
-  ["lower blackrock spire"] = "Blackrock Spire",
-  ["pico da rocha negra superior"] = "Blackrock Spire",
-  ["pico da rocha negra inferior"] = "Blackrock Spire",
-  ["cumbre de roca negra superior"] = "Blackrock Spire",
-  ["cumbre de roca negra inferior"] = "Blackrock Spire",
-  ["dire maul (east)"] = "Dire Maul",
-  ["dire maul (north)"] = "Dire Maul",
-  ["dire maul (west)"] = "Dire Maul",
-  ["dire maul - east"] = "Dire Maul",
-  ["dire maul - north"] = "Dire Maul",
-  ["dire maul - west"] = "Dire Maul",
-  ["gládio cruel (leste)"] = "Dire Maul",
-  ["gládio cruel (norte)"] = "Dire Maul",
-  ["gládio cruel (oeste)"] = "Dire Maul",
-  ["stratholme - main gate"] = "Stratholme",
-  ["stratholme - service entrance"] = "Stratholme",
-  ["stratholme (portão principal)"] = "Stratholme",
-  ["stratholme (entrada de serviço)"] = "Stratholme",
+  -- Alas/lados diferenciados: cada entrada Blizzard → chave própria (LBRS≠UBRS etc.).
+  ["upper blackrock spire"] = "UBRS",
+  ["lower blackrock spire"] = "LBRS",
+  ["pico da rocha negra superior"] = "UBRS",
+  ["pico da rocha negra inferior"] = "LBRS",
+  ["cumbre de roca negra superior"] = "UBRS",
+  ["cumbre de roca negra inferior"] = "LBRS",
+  ["dire maul (east)"] = "DM East",
+  ["dire maul (north)"] = "DM North",
+  ["dire maul (west)"] = "DM West",
+  ["dire maul - east"] = "DM East",
+  ["dire maul - north"] = "DM North",
+  ["dire maul - west"] = "DM West",
+  ["gládio cruel (leste)"] = "DM East",
+  ["gládio cruel (norte)"] = "DM North",
+  ["gládio cruel (oeste)"] = "DM West",
+  ["stratholme - main gate"] = "Strat Live",
+  ["stratholme - service entrance"] = "Strat UD",
+  ["stratholme (portão principal)"] = "Strat Live",
+  ["stratholme (entrada de serviço)"] = "Strat UD",
+  ["stratholme (main gate)"] = "Strat Live",
+  ["stratholme (service entrance)"] = "Strat UD",
+  -- Variantes hífen/parênteses de outros idiomas (o pack cobre a forma principal).
+  ["gládio cruel - leste"] = "DM East",
+  ["gládio cruel - norte"] = "DM North",
+  ["gládio cruel - oeste"] = "DM West",
+  ["stratholme - portão principal"] = "Strat Live",
+  ["stratholme - entrada de serviço"] = "Strat UD",
+  ["la masacre (este)"] = "DM East",
+  ["la masacre (norte)"] = "DM North",
+  ["la masacre (oeste)"] = "DM West",
+  ["la masacre - este"] = "DM East",
+  ["la masacre - norte"] = "DM North",
+  ["la masacre - oeste"] = "DM West",
+  ["stratholme (puerta principal)"] = "Strat Live",
+  ["stratholme (entrada de servicio)"] = "Strat UD",
+  ["hache-tripes (est)"] = "DM East",
+  ["hache-tripes (nord)"] = "DM North",
+  ["hache-tripes (ouest)"] = "DM West",
+  ["hache-tripes - est"] = "DM East",
+  ["hache-tripes - nord"] = "DM North",
+  ["hache-tripes - ouest"] = "DM West",
+  ["pic rochenoire inférieur"] = "LBRS",
+  ["pic rochenoire supérieur"] = "UBRS",
+  ["stratholme (porte principale)"] = "Strat Live",
+  ["stratholme (entrée de service)"] = "Strat UD",
+  ["düsterbruch (ost)"] = "DM East",
+  ["düsterbruch (nord)"] = "DM North",
+  ["düsterbruch (west)"] = "DM West",
+  ["düsterbruch - ost"] = "DM East",
+  ["düsterbruch - nord"] = "DM North",
+  ["düsterbruch - west"] = "DM West",
+  ["untere schwarzfelsspitze"] = "LBRS",
+  ["obere schwarzfelsspitze"] = "UBRS",
+  ["stratholme (haupttor)"] = "Strat Live",
+  ["stratholme (diensteingang)"] = "Strat UD",
   ["scarlet monastery - graveyard"] = "SM Graveyard",
   ["scarlet monastery - library"] = "SM Library",
   ["scarlet monastery - armory"] = "SM Armory",
@@ -250,6 +300,102 @@ local ACTIVITY_NAME_ALIASES = {
   ["biblioteca escarlate"] = "SM Library",
   ["armaria escarlate"] = "SM Armory",
   ["catedral escarlate"] = "SM Cathedral",
+  -- TBC / Outland (variantes comuns do Premade / locales).
+  ["hellfire ramparts"] = "Hellfire Ramparts",
+  ["the blood furnace"] = "Blood Furnace",
+  ["blood furnace"] = "Blood Furnace",
+  ["the shattered halls"] = "Shattered Halls",
+  ["shattered halls"] = "Shattered Halls",
+  ["the slave pens"] = "Slave Pens",
+  ["slave pens"] = "Slave Pens",
+  ["the underbog"] = "Underbog",
+  ["the steamvault"] = "Steamvault",
+  ["steamvault"] = "Steamvault",
+  ["mana-tombs"] = "Mana-Tombs",
+  ["mana tombs"] = "Mana-Tombs",
+  ["auchenai crypts"] = "Auchenai Crypts",
+  ["sethekk halls"] = "Sethekk Halls",
+  ["shadow labyrinth"] = "Shadow Labyrinth",
+  ["old hillsbrad foothills"] = "Old Hillsbrad",
+  ["old hillsbrad"] = "Old Hillsbrad",
+  ["the black morass"] = "Black Morass",
+  ["black morass"] = "Black Morass",
+  ["magisters' terrace"] = "Magisters' Terrace",
+  ["magister's terrace"] = "Magisters' Terrace",
+  ["the mechanar"] = "Mechanar",
+  ["mechanar"] = "Mechanar",
+  ["the botanica"] = "Botanica",
+  ["botanica"] = "Botanica",
+  ["the arcatraz"] = "Arcatraz",
+  ["arcatraz"] = "Arcatraz",
+  ["tempest keep - the mechanar"] = "Mechanar",
+  ["tempest keep - the botanica"] = "Botanica",
+  ["tempest keep - the arcatraz"] = "Arcatraz",
+  ["bastilha da tormenta - mecanar"] = "Mechanar",
+  ["bastilha da tormenta - jardim botânico"] = "Botanica",
+  ["bastilha da tormenta - jardim botanico"] = "Botanica",
+  ["bastilha da tormenta - arcatraz"] = "Arcatraz",
+  ["gruul's lair"] = "Gruul's Lair",
+  ["magtheridon's lair"] = "Magtheridon",
+  ["magtheridon"] = "Magtheridon",
+  ["serpentshrine cavern"] = "SSC",
+  ["tempest keep"] = "Tempest Keep",
+  ["the eye"] = "Tempest Keep",
+  ["the battle for mount hyjal"] = "Hyjal",
+  ["battle for mount hyjal"] = "Hyjal",
+  ["hyjal summit"] = "Hyjal",
+  ["black temple"] = "Black Temple",
+  ["zul'aman"] = "Zul'Aman",
+  ["sunwell plateau"] = "Sunwell Plateau",
+  ["muralha fogo do inferno"] = "Hellfire Ramparts",
+  ["fornalha de sangue"] = "Blood Furnace",
+  ["salões despedaçados"] = "Shattered Halls",
+  ["pátio dos escravos"] = "Slave Pens",
+  ["brejo oculto"] = "Underbog",
+  ["câmara dos vapores"] = "Steamvault",
+  ["tumbas de mana"] = "Mana-Tombs",
+  ["catacumbas auchenai"] = "Auchenai Crypts",
+  ["salões dos sethekk"] = "Sethekk Halls",
+  ["labirinto soturno"] = "Shadow Labyrinth",
+  ["terraço dos magísteres"] = "Magisters' Terrace",
+  ["covil de gruul"] = "Gruul's Lair",
+  ["covil de magtheridon"] = "Magtheridon",
+  ["caverna do serpentário"] = "SSC",
+  ["bastilha da tempestade"] = "Tempest Keep",
+  ["templo negro"] = "Black Temple",
+  ["platô da nascente do sol"] = "Sunwell Plateau",
+  -- TBC Heroic
+  ["hellfire ramparts (heroic)"] = "Hellfire Ramparts Heroic",
+  ["heroic hellfire ramparts"] = "Hellfire Ramparts Heroic",
+  ["the blood furnace (heroic)"] = "Blood Furnace Heroic",
+  ["heroic blood furnace"] = "Blood Furnace Heroic",
+  ["the shattered halls (heroic)"] = "Shattered Halls Heroic",
+  ["heroic shattered halls"] = "Shattered Halls Heroic",
+  ["the slave pens (heroic)"] = "Slave Pens Heroic",
+  ["heroic slave pens"] = "Slave Pens Heroic",
+  ["the underbog (heroic)"] = "Underbog Heroic",
+  ["heroic underbog"] = "Underbog Heroic",
+  ["the steamvault (heroic)"] = "Steamvault Heroic",
+  ["heroic steamvault"] = "Steamvault Heroic",
+  ["mana-tombs (heroic)"] = "Mana-Tombs Heroic",
+  ["heroic mana-tombs"] = "Mana-Tombs Heroic",
+  ["auchenai crypts (heroic)"] = "Auchenai Crypts Heroic",
+  ["sethekk halls (heroic)"] = "Sethekk Halls Heroic",
+  ["shadow labyrinth (heroic)"] = "Shadow Labyrinth Heroic",
+  ["old hillsbrad foothills (heroic)"] = "Old Hillsbrad Heroic",
+  ["the black morass (heroic)"] = "Black Morass Heroic",
+  ["magisters' terrace (heroic)"] = "Magisters' Terrace Heroic",
+  ["heroic magisters' terrace"] = "Magisters' Terrace Heroic",
+  ["the mechanar (heroic)"] = "Mechanar Heroic",
+  ["heroic mechanar"] = "Mechanar Heroic",
+  ["the botanica (heroic)"] = "Botanica Heroic",
+  ["heroic botanica"] = "Botanica Heroic",
+  ["the arcatraz (heroic)"] = "Arcatraz Heroic",
+  ["heroic arcatraz"] = "Arcatraz Heroic",
+  ["bastilha da tormenta - arcatraz (heroico)"] = "Arcatraz Heroic",
+  ["bastilha da tormenta - mecanar (heroico)"] = "Mechanar Heroic",
+  ["bastilha da tormenta - jardim botânico (heroico)"] = "Botanica Heroic",
+  ["bastilha da tormenta - jardim botanico (heroico)"] = "Botanica Heroic",
 }
 
 --- Resolve chave EN da instância a partir do nome Blizzard (qualquer idioma do pack).
@@ -262,48 +408,16 @@ local function resolveInstanceKeyFromActivityName(name)
   if alias then
     return alias
   end
-  -- Alias parcial (ex. "Gládio Cruel (leste)" já coberto; genérico por contém).
+  -- Alias parcial só para needles longos (alas SM/DM etc.).
   for needle, key in pairs(ACTIVITY_NAME_ALIASES) do
-    if #needle >= 8 and lower:find(needle, 1, true) then
+    if #needle >= 12 and lower:find(needle, 1, true) then
       return key
     end
   end
-  local packs = CEF.INSTANCE_DISPLAY_NAMES
-  if type(packs) ~= "table" then
-    return nil
+  if CEF.resolveInstanceKeyFromName then
+    return CEF.resolveInstanceKeyFromName(name)
   end
-  -- Exacto primeiro.
-  for _, pack in pairs(packs) do
-    if type(pack) == "table" then
-      for key, localized in pairs(pack) do
-        if localized == name or key == name then
-          return key
-        end
-      end
-    end
-  end
-  -- Parcial: maior match (ex. "Pico da Rocha Negra Superior" → Blackrock Spire).
-  local bestKey, bestLen = nil, 0
-  for _, pack in pairs(packs) do
-    if type(pack) == "table" then
-      for key, localized in pairs(pack) do
-        if type(localized) == "string" and localized ~= "" then
-          local ll = string.lower(localized)
-          local hit = lower:find(ll, 1, true) or ll:find(lower, 1, true)
-          if hit and #localized > bestLen then
-            bestKey = key
-            bestLen = #localized
-          end
-        end
-        local kl = string.lower(tostring(key))
-        if #kl >= 5 and lower:find(kl, 1, true) and #kl > bestLen then
-          bestKey = key
-          bestLen = #kl
-        end
-      end
-    end
-  end
-  return bestKey
+  return nil
 end
 
 local function activityRawName(activityID, info)
@@ -344,20 +458,111 @@ function LFG.getSearchText()
   return searchText
 end
 
+local function resultFitsPlayerLevel(row)
+  local lvl = UnitLevel and UnitLevel("player")
+  if not lvl then
+    return false
+  end
+  local minV = row and row.minLevel
+  local maxV = row and row.maxLevel
+  if minV then
+    maxV = maxV or minV
+    return lvl >= minV and lvl <= maxV
+  end
+  local function fitsName(name)
+    if type(name) ~= "string" or name == "" or not CEF.levelBoundsForDisplayName then
+      return false
+    end
+    local a, b = CEF.levelBoundsForDisplayName(name)
+    if not a then
+      return false
+    end
+    b = b or a
+    return lvl >= a and lvl <= b
+  end
+  if fitsName(row and row.activityName) then
+    return true
+  end
+  local ids = row and row.activityIDs
+  if type(ids) == "table" then
+    for _, aid in ipairs(ids) do
+      if fitsName(activityDisplayName(aid)) then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+local function resultMatchesActivityFilter(row)
+  if not LFG.hasActivityFilter() then
+    return true
+  end
+  if filterMyLevel then
+    return resultFitsPlayerLevel(row)
+  end
+  local ids = row and row.activityIDs
+  if type(ids) ~= "table" then
+    return false
+  end
+  for _, aid in ipairs(ids) do
+    aid = tonumber(aid)
+    if aid and selectedActivityIds[aid] then
+      return true
+    end
+  end
+  -- Fallback: alguns clientes devolvem só o nome.
+  local name = string.lower(tostring(row.activityName or ""))
+  if name ~= "" then
+    for sid in pairs(selectedActivityIds) do
+      local selectedName = string.lower(activityDisplayName(sid) or "")
+      if selectedName ~= "" and (name == selectedName or name:find(selectedName, 1, true) or selectedName:find(name, 1, true)) then
+        return true
+      end
+    end
+  end
+  return false
+end
+
 function LFG.getFilteredResults()
   local q = searchText
-  if not q or q == "" then
+  local needActivity = LFG.hasActivityFilter()
+  local needText = q and q ~= ""
+  if not needActivity and not needText then
     return results
   end
   local out = {}
   for _, row in ipairs(results) do
-    local hay = string.lower(table.concat({
-      tostring(row.leaderName or ""),
-      tostring(row.activityName or ""),
-      tostring(row.comment or ""),
-    }, " "))
-    if hay:find(q, 1, true) then
-      out[#out + 1] = row
+    if resultMatchesActivityFilter(row) then
+      if not needText then
+        out[#out + 1] = row
+      else
+        local parts = {
+          tostring(row.leaderName or ""),
+          tostring(row.activityName or ""),
+          tostring(row.comment or ""),
+        }
+        -- Nomes no locale do addon (e chave EN) por atividade resolvida.
+        local entries = row.instanceEntries
+        if type(entries) == "table" then
+          for _, ie in ipairs(entries) do
+            if ie.key and CEF.instanceSearchHay then
+              parts[#parts + 1] = CEF.instanceSearchHay(ie.key)
+            elseif ie.key and CEF.getInstanceDisplayName then
+              parts[#parts + 1] = tostring(CEF.getInstanceDisplayName(ie.key) or "")
+              parts[#parts + 1] = tostring(ie.key)
+            end
+            if ie.name then
+              parts[#parts + 1] = tostring(ie.name)
+            end
+          end
+        end
+        local hay = string.lower(table.concat(parts, " "))
+        hay = hay:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+        if hay:find(q, 1, true) then
+          out[#out + 1] = row
+        end
+      end
     end
   end
   return out
@@ -385,6 +590,7 @@ function LFG.setSelectedCategoryId(id)
   if newId and newId ~= selectedCategoryId then
     selectedCategoryId = newId
     wipe(selectedActivityIds)
+    filterMyLevel = false
   elseif newId then
     selectedCategoryId = newId
   end
@@ -497,8 +703,25 @@ function LFG.getActivities(categoryId)
   end
   for _, aid in ipairs(ids) do
     local info = activityInfoTable(aid)
-    local name = activityDisplayName(aid, info)
+    local raw = activityRawName(aid, info)
+    local instKey = resolveInstanceKeyFromActivityName(raw)
+    local name = (instKey and CEF.getInstanceDisplayName and CEF.getInstanceDisplayName(instKey)) or raw
     local minV, maxV = activityLevelBounds(info, name)
+    if (not minV) and instKey and CEF.levelBoundsForDisplayName then
+      minV, maxV = CEF.levelBoundsForDisplayName(name)
+    end
+    local isTbc = false
+    local isTbcHeroic = false
+    if CEF.isTbcActive and CEF.isTbcActive() then
+      if instKey and CEF.instanceKeyIsTbcHeroic and CEF.instanceKeyIsTbcHeroic(instKey) then
+        isTbc = true
+        isTbcHeroic = true
+      elseif instKey and CEF.instanceKeyIsTbc and CEF.instanceKeyIsTbc(instKey) then
+        isTbc = true
+      elseif not instKey and minV and minV >= 58 then
+        isTbc = true
+      end
+    end
     out[#out + 1] = {
       id = aid,
       name = name,
@@ -506,9 +729,25 @@ function LFG.getActivities(categoryId)
       minLevel = minV or 999,
       maxLevel = maxV or minV or 999,
       orderIndex = (type(info) == "table" and tonumber(info.orderIndex)) or 0,
+      instanceKey = instKey,
+      isTbc = isTbc,
+      isTbcHeroic = isTbcHeroic,
     }
   end
   table.sort(out, function(a, b)
+    local function bucket(x)
+      if x.isTbcHeroic then
+        return 2
+      end
+      if x.isTbc then
+        return 1
+      end
+      return 0
+    end
+    local aB, bB = bucket(a), bucket(b)
+    if aB ~= bB then
+      return aB < bB
+    end
     if a.minLevel ~= b.minLevel then
       return a.minLevel < b.minLevel
     end
@@ -534,7 +773,7 @@ end
 
 function LFG.isActivitySelected(activityId)
   activityId = tonumber(activityId)
-  if not activityId then
+  if not activityId or filterMyLevel then
     return false
   end
   -- Vazio = todas (nenhuma restrição marcada).
@@ -550,14 +789,39 @@ function LFG.isActivitySelected(activityId)
 end
 
 function LFG.hasActivityFilter()
+  if filterMyLevel then
+    return true
+  end
   for _ in pairs(selectedActivityIds) do
     return true
   end
   return false
 end
 
+function LFG.isMyLevelFilter()
+  return filterMyLevel and true or false
+end
+
+function LFG.setMyLevelFilter(on)
+  filterMyLevel = on and true or false
+  if filterMyLevel then
+    wipe(selectedActivityIds)
+  end
+end
+
+function LFG.toggleMyLevelFilter()
+  if filterMyLevel then
+    filterMyLevel = false
+  else
+    filterMyLevel = true
+    wipe(selectedActivityIds)
+  end
+  return filterMyLevel
+end
+
 function LFG.clearActivitySelection()
   wipe(selectedActivityIds)
+  filterMyLevel = false
 end
 
 function LFG.toggleActivity(activityId)
@@ -565,6 +829,7 @@ function LFG.toggleActivity(activityId)
   if not activityId then
     return
   end
+  filterMyLevel = false
   if selectedActivityIds[activityId] then
     selectedActivityIds[activityId] = nil
   else
@@ -573,6 +838,9 @@ function LFG.toggleActivity(activityId)
 end
 
 function LFG.activityFilterSummary()
+  if filterMyLevel then
+    return CEF.L.FILTER_MY_LEVEL_INSTANCES or "Instances for my character"
+  end
   local selected = LFG.getSelectedActivityIds()
   if #selected == 0 then
     return CEF.L.LFG_ALL_ACTIVITIES
@@ -583,45 +851,115 @@ function LFG.activityFilterSummary()
   return CEF.L("LFG_N_ACTIVITIES", #selected)
 end
 
-local function resolveSearchActivityIds(categoryId)
-  local selected = LFG.getSelectedActivityIds()
-  if #selected > 0 then
-    return selected
+local function stopSearchWatch()
+  if searchWatch then
+    searchWatch:Hide()
   end
-  if LFGUtil_GetFilteredActivities then
-    local all = LFGUtil_GetFilteredActivities(categoryId)
-    if type(all) == "table" and #all > 0 then
-      return all
+end
+
+local function finishSearchFromWatchdog()
+  if not searching then
+    stopSearchWatch()
+    return
+  end
+  searching = false
+  searchFailed = false
+  stopSearchWatch()
+  -- Mostra o que existir no cliente mesmo sem o evento.
+  LFG.refreshResults()
+  local pending = pendingSearchCategory
+  pendingSearchCategory = nil
+  if pending then
+    LFG.search(pending, { force = true })
+  end
+end
+
+local function ensureSearchWatch()
+  if searchWatch then
+    return searchWatch
+  end
+  searchWatch = CreateFrame("Frame")
+  searchWatch:Hide()
+  searchWatch:SetScript("OnUpdate", function(self)
+    if not searching then
+      self:Hide()
+      return
     end
-  end
-  if C_LFGList.GetAvailableActivities then
-    local all = C_LFGList.GetAvailableActivities(categoryId)
-    if type(all) == "table" then
-      return all
+    local now = (GetTime and GetTime()) or 0
+    if (now - lastSearchAt) >= SEARCH_TIMEOUT then
+      finishSearchFromWatchdog()
     end
-  end
-  return nil
+  end)
+  return searchWatch
+end
+
+local function beginSearchWatch()
+  ensureSearchWatch():Show()
 end
 
 local function activityNameFromIds(activityIDs)
   if type(activityIDs) ~= "table" or #activityIDs == 0 then
     return ""
   end
-  local names = {}
-  for i = 1, math.min(3, #activityIDs) do
-    local aid = activityIDs[i]
+  local names, seen = {}, {}
+  for _, aid in ipairs(activityIDs) do
     local name = activityDisplayName(aid)
     if name and name ~= "" then
-      names[#names + 1] = name
+      local dk = string.lower(name)
+      if not seen[dk] then
+        seen[dk] = true
+        names[#names + 1] = name
+        if #names >= 5 then
+          break
+        end
+      end
     end
   end
   if #names == 0 then
     return ""
   end
-  if #activityIDs > #names then
-    return table.concat(names, ", ") .. " +"
-  end
   return table.concat(names, ", ")
+end
+
+-- Nome + níveis coloridos; deduplica IDs da Blizzard que apontam à mesma DG.
+-- Retorna richText, lineCount (instâncias distintas, máx. 5).
+local function activityRichTextFromIds(activityIDs)
+  if type(activityIDs) ~= "table" or #activityIDs == 0 then
+    return "—", 1
+  end
+  local parts, seen = {}, {}
+  for _, aid in ipairs(activityIDs) do
+    local info = activityInfoTable(aid)
+    local raw = activityRawName(aid, info)
+    local key = resolveInstanceKeyFromActivityName(raw)
+    local name = activityDisplayName(aid, info)
+    if name and name ~= "" then
+      local dk = key or string.lower(name)
+      if not seen[dk] then
+        seen[dk] = true
+        local minV, maxV = activityLevelBounds(info, name)
+        if (not minV) and key and CEF.levelBoundsForDisplayName then
+          minV, maxV = CEF.levelBoundsForDisplayName(name)
+        end
+        if CEF.activityNameLevelsRichText then
+          parts[#parts + 1] = CEF.activityNameLevelsRichText(name, minV, maxV, key)
+        else
+          parts[#parts + 1] = name
+        end
+        if #parts >= 5 then
+          break
+        end
+      end
+    end
+  end
+  if #parts == 0 then
+    return "—", 1
+  end
+  if #parts == 1 then
+    return parts[1], 1
+  end
+  -- Uma instância por linha (como a coluna Instância/níveis do Chat).
+  return table.concat(parts, "\n\n"), #parts
 end
 
 local function memberCounts(resultID)
@@ -768,8 +1106,62 @@ local function normalizeResult(resultID)
   if type(activityIDs) ~= "table" and info.activityID then
     activityIDs = { info.activityID }
   end
+  activityIDs = activityIDs or {}
+  local activityName = activityNameFromIds(activityIDs)
+  local activityRichText, activityLineCount = activityRichTextFromIds(activityIDs)
+  local instanceEntries = {}
+  local seenInst = {}
+  for _, aid in ipairs(activityIDs) do
+    local aInfo = activityInfoTable(aid)
+    local raw = activityRawName(aid, aInfo)
+    local key = resolveInstanceKeyFromActivityName(raw)
+    local name = activityDisplayName(aid, aInfo)
+    if name and name ~= "" then
+      local dk = key or string.lower(name)
+      if not seenInst[dk] then
+        seenInst[dk] = true
+        local minV, maxV = activityLevelBounds(aInfo, name)
+        if (not minV) and key and CEF.levelBoundsForDisplayName then
+          minV, maxV = CEF.levelBoundsForDisplayName(
+            (CEF.getInstanceDisplayName and CEF.getInstanceDisplayName(key)) or name
+          )
+        end
+        instanceEntries[#instanceEntries + 1] = {
+          key = key,
+          name = name,
+          minLevel = minV,
+          maxLevel = maxV or minV,
+          maxNumPlayers = (type(aInfo) == "table" and tonumber(aInfo.maxNumPlayers)) or nil,
+        }
+        if #instanceEntries >= 5 then
+          break
+        end
+      end
+    end
+  end
+  local minLevel, maxLevel = nil, nil
+  for _, aid in ipairs(activityIDs) do
+    local aInfo = activityInfoTable(aid)
+    local aName = activityDisplayName(aid, aInfo)
+    local minV, maxV = activityLevelBounds(aInfo, aName)
+    if minV then
+      maxV = maxV or minV
+      if not minLevel or minV < minLevel then
+        minLevel = minV
+      end
+      if not maxLevel or maxV > maxLevel then
+        maxLevel = maxV
+      end
+    end
+  end
+  if not minLevel and activityName ~= "" then
+    minLevel, maxLevel = activityLevelBounds(nil, activityName)
+    if minLevel then
+      maxLevel = maxLevel or minLevel
+    end
+  end
   local counts = memberCounts(resultID)
-  local roleDisplay = LFG.buildRoleDisplay(counts, activityIDs or {})
+  local roleDisplay = LFG.buildRoleDisplay(counts, activityIDs)
   return {
     id = resultID,
     leaderName = info.leaderName or info.name or "?",
@@ -778,8 +1170,13 @@ local function normalizeResult(resultID)
     numMembers = tonumber(info.numMembers) or 0,
     age = tonumber(info.age) or 0,
     ageText = formatAge(info.age),
-    activityName = activityNameFromIds(activityIDs or {}),
-    activityIDs = activityIDs or {},
+    activityName = activityName,
+    activityRichText = activityRichText,
+    activityLineCount = activityLineCount or 1,
+    activityIDs = activityIDs,
+    instanceEntries = instanceEntries,
+    minLevel = minLevel,
+    maxLevel = maxLevel,
     counts = counts,
     roleDisplay = roleDisplay,
     roleSlots = roleDisplay.slots,
@@ -800,6 +1197,10 @@ function LFG.getResults()
   return results
 end
 
+local lastResultRefreshAt = 0
+local RESULT_REFRESH_THROTTLE = 0.35
+local MAX_RESULTS_NORMALIZE = 200
+
 function LFG.refreshResults()
   wipe(results)
   if not LFG.isAvailable() then
@@ -811,44 +1212,66 @@ function LFG.refreshResults()
     total, ids = C_LFGList.GetSearchResults()
   end
   ids = ids or {}
-  for _, resultID in ipairs(ids) do
-    local row = normalizeResult(resultID)
+  local n = #ids
+  if n > MAX_RESULTS_NORMALIZE then
+    n = MAX_RESULTS_NORMALIZE
+  end
+  for i = 1, n do
+    local row = normalizeResult(ids[i])
     if row then
       results[#results + 1] = row
     end
   end
+  -- Mais recentes primeiro (menor idade).
+  table.sort(results, function(a, b)
+    local ageA = tonumber(a.age) or 0
+    local ageB = tonumber(b.age) or 0
+    if ageA ~= ageB then
+      return ageA < ageB
+    end
+    return tostring(a.leaderName or "") < tostring(b.leaderName or "")
+  end)
+  lastResultRefreshAt = (GetTime and GetTime()) or 0
   notify()
   return results
 end
 
-function LFG.search(categoryId)
+function LFG.search(categoryId, opts)
   if not LFG.isAvailable() then
     return false, "unavailable"
   end
-  if searching then
-    return false, "busy"
-  end
+  opts = type(opts) == "table" and opts or {}
   categoryId = tonumber(categoryId) or LFG.getSelectedCategoryId()
   if not categoryId or categoryId <= 0 then
     return false, "no_category"
   end
+
+  local now = (GetTime and GetTime()) or 0
+  if searching then
+    local elapsed = now - (lastSearchAt or 0)
+    if not opts.force and elapsed < SEARCH_TIMEOUT then
+      -- Guarda o pedido mais recente; evita perder filtros enquanto a busca corre.
+      pendingSearchCategory = categoryId
+      return false, "busy"
+    end
+    -- Busca antiga presa ou force: liberta o cadeado.
+    searching = false
+    stopSearchWatch()
+  end
+
+  pendingSearchCategory = nil
   selectedCategoryId = categoryId
   searching = true
   searchFailed = false
-  lastSearchAt = GetTime and GetTime() or 0
+  lastSearchAt = now
+  beginSearchWatch()
   notify()
 
-  local activityIDs = resolveSearchActivityIds(categoryId)
   local filter, preferredFilters = 0, 0
+  -- Busca só por categoria (rápido). Filtro de atividades fica no cliente.
   local ok = pcall(function()
-    -- Classic Era: Search(categoryID, filter, preferredFilters, languageFilter, crossFaction, advancedFilter, activityIDs)
-    C_LFGList.Search(categoryId, filter, preferredFilters, nil, false, nil, activityIDs)
+    C_LFGList.Search(categoryId, filter, preferredFilters)
   end)
-  if not ok then
-    ok = pcall(function()
-      C_LFGList.Search(categoryId, filter, preferredFilters, nil, false, nil)
-    end)
-  end
   if not ok then
     ok = pcall(function()
       C_LFGList.Search(categoryId, filter)
@@ -857,6 +1280,7 @@ function LFG.search(categoryId)
   if not ok then
     searching = false
     searchFailed = true
+    stopSearchWatch()
     notify()
     return false, "search_error"
   end
@@ -867,14 +1291,32 @@ function LFG.handleEvent(event, ...)
   if event == "LFG_LIST_SEARCH_RESULTS_RECEIVED" then
     searching = false
     searchFailed = false
+    stopSearchWatch()
     LFG.refreshResults()
+    local pending = pendingSearchCategory
+    pendingSearchCategory = nil
+    if pending then
+      LFG.search(pending, { force = true })
+    end
   elseif event == "LFG_LIST_SEARCH_FAILED" then
     searching = false
     searchFailed = true
+    stopSearchWatch()
     wipe(results)
     notify()
+    local pending = pendingSearchCategory
+    pendingSearchCategory = nil
+    if pending then
+      LFG.search(pending, { force = true })
+    end
   elseif event == "LFG_LIST_SEARCH_RESULT_UPDATED" then
-    LFG.refreshResults()
+    -- Atualização pontual: throttle — o cliente dispara isto em rajada.
+    if not searching then
+      local now = (GetTime and GetTime()) or 0
+      if (now - lastResultRefreshAt) >= RESULT_REFRESH_THROTTLE then
+        LFG.refreshResults()
+      end
+    end
   elseif event == "LFG_LIST_AVAILABILITY_UPDATE" then
     if not selectedCategoryId then
       LFG.getSelectedCategoryId()

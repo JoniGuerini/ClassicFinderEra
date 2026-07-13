@@ -13,45 +13,19 @@ local INSTANCE_ROWS = {
   { key = "Molten Core", needles = { "molten core", "ragnaros", "geddon", "golemagg", "magmadar", "lucifron", " mc ", " mc,", "full mc", "molten", "m mc", " gdkp mc", "mc gdkp" } },
   { key = "Blackwing Lair", needles = { "blackwing", "bwl ", " bwl", "nefarian", "razorgore", "vael" } },
   { key = "Onyxia", needles = { "onyxia", " ony ", " ony.", "ony run" } },
-  {
-    key = "Stratholme",
-    needles = {
-      "stratholme",
-      "strat ",
-      " strat",
-      "strat(",
-      "strat)",
-      "strat,",
-      "strat.",
-      "strat-",
-      "strat live",
-      "strat ud",
-      "rivendare",
-      "baron run",
-    },
-  },
+  -- Stratholme: 2 entradas separadas (viva = portão principal; morta-viva = entrada de serviço).
+  -- Menção genérica («strat») sem lado → expande para as 2 em detectInstances.
+  { key = "Strat Live", needles = { "strat live", "live strat", "live side", "main gate", "strat(live", "strat (live" } },
+  { key = "Strat UD", needles = { "strat ud", "ud strat", "strat undead", "undead strat", "ud side", "baron run", "baron side", "rivendare", "service entrance" } },
   { key = "Scholomance", needles = { "scholomance", "scholo", "gandling", "darkmaster" } },
-  {
-    key = "Dire Maul",
-    needles = {
-      "dire maul",
-      " dm ",
-      "-> dm",
-      "> dm ",
-      "^dm ",
-      " dm,",
-      " dm.",
-      " dm/",
-      "/dm ",
-      "dm north",
-      "dm east",
-      "dm west",
-      "dm tribute",
-      "immol'thar",
-      "alzzin",
-    },
-  },
-  { key = "Blackrock Spire", needles = { "ubrs", "lbrs", "blackrock spire", "lower spire", "upper spire", "drakkisath", "rend " } },
+  -- Dire Maul: 3 alas separadas. Menção genérica («dm») sem ala → expande para as 3.
+  { key = "DM East", needles = { "dm east", "dm: east", "dm:e", "dm e ", "dme ", " dme", "east dm", "alzzin", "pusillin" } },
+  { key = "DM West", needles = { "dm west", "dm: west", "dm:w", "dm w ", "dmw ", " dmw", "west dm", "immol'thar", "immolthar", "tendris" } },
+  { key = "DM North", needles = { "dm north", "dm: north", "dm:n", "dm n ", "dmn ", " dmn", "north dm", "dm tribute", "tribute run", "king gordok" } },
+  -- Blackrock Spire: inferior (5-man) e superior (10-man) separados.
+  -- Menção genérica («blackrock spire»/«brs») sem lado → expande para as 2.
+  { key = "LBRS", needles = { "lbrs", "lower spire", "lower blackrock", "lower brs", "wyrmthalak", "voone", "halycon" } },
+  { key = "UBRS", needles = { "ubrs", "upper spire", "upper blackrock", "upper brs", "drakkisath", "rend ", "gyth", "jed run" } },
   { key = "Blackrock Depths", needles = { "blackrock depths", "brd ", " brd", "angerforge", "emperor ", "lokhtos", "arena run" } },
   { key = "Sunken Temple", needles = { "sunken temple", "atal'hakkar", "atal hakkar", " jammalan", "eranikus" } },
   { key = "Maraudon", needles = { "maraudon", " mara ", "mara run", "princess ", "rotgrip", "landslide" } },
@@ -91,9 +65,10 @@ local INSTANCE_ROWS = {
 -- ===== Season of Discovery =====
 -- Conteúdo exclusivo SoD: só entra na deteção/filtros/termos em realm SoD
 -- (Era e Hardcore não veem estas entradas).
+-- Nota: "karazhan" aqui é Crypts (SoD). No TBC a raid Karazhan vive em TBC_INSTANCE_ROWS.
 local SOD_INSTANCE_ROWS = {
   { key = "Demon Fall Canyon", needles = { "demon fall", "demonfall", "dfc ", " dfc" } },
-  { key = "Karazhan Crypts", needles = { "karazhan", "kara crypt", "crypts" } },
+  { key = "Karazhan Crypts", needles = { "karazhan", "kara crypt", "karazhan crypt", "crypts" } },
   { key = "Scarlet Enclave", needles = { "scarlet enclave", "enclave", "tse ", " tse" } },
 }
 
@@ -112,7 +87,276 @@ local SOD_LEVEL_RANGE = {
   ["Sunken Temple"] = "50-60",
 }
 
+-- ===== Burning Crusade / TBC Anniversary =====
+-- Outland (+ Magisters / Sunwell): só no cliente TBC (vanilla 60 permanece na base).
+-- Needles no mesmo estilo Classic: abreviações EN do chat (não nomes i18n —
+-- esses vão em InstanceNames para a UI). Masmorras: Normal + "… Heroic".
+local TBC_DUNGEON_ROWS = {
+  -- Hellfire Citadel
+  {
+    key = "Hellfire Ramparts",
+    needles = { "hellfire ramparts", "ramparts", "ramps ", " ramps", "rampart" },
+  },
+  {
+    key = "Blood Furnace",
+    needles = { "blood furnace", " bf ", "/bf", "bf/", "bf,", "bf.", "bf:" },
+  },
+  {
+    key = "Shattered Halls",
+    needles = { "shattered halls", "shattered hall", "shalls", " shh ", "shh " },
+  },
+  -- Coilfang Reservoir
+  {
+    key = "Slave Pens",
+    needles = { "slave pens", "slave pen", " pens " },
+  },
+  {
+    key = "Underbog",
+    needles = { "underbog" },
+  },
+  {
+    key = "Steamvault",
+    needles = { "steamvault", "steam vault" },
+  },
+  -- Auchindoun
+  {
+    key = "Mana-Tombs",
+    needles = { "mana-tombs", "mana tombs", "manatombs" },
+  },
+  {
+    key = "Auchenai Crypts",
+    needles = { "auchenai", "auchenai crypt" },
+  },
+  {
+    key = "Sethekk Halls",
+    needles = { "sethekk", "seth halls" },
+  },
+  {
+    key = "Shadow Labyrinth",
+    needles = { "shadow labyrinth", "shadow lab", "slab ", " slab" },
+  },
+  -- Caverns of Time
+  {
+    key = "Old Hillsbrad",
+    needles = { "old hillsbrad", "hillsbrad", "ohb ", " ohb", "durnholde", "thrall run" },
+  },
+  {
+    key = "Black Morass",
+    needles = { "black morass", "morass", "opening of the dark portal" },
+  },
+  -- Isle of Quel'Danas
+  {
+    key = "Magisters' Terrace",
+    needles = { "magisters", "magister", "mgt ", " mgt" },
+  },
+  -- Tempest Keep satellites (dungeons; o raid "Tempest Keep" / The Eye fica em TBC_RAID_ROWS)
+  {
+    key = "Mechanar",
+    needles = { "mechanar", "mech ", " mech" },
+  },
+  {
+    key = "Botanica",
+    needles = { "botanica" },
+  },
+  {
+    key = "Arcatraz",
+    needles = { "arcatraz", "arca " },
+  },
+}
+
+local TBC_RAID_ROWS = {
+  {
+    key = "Karazhan",
+    needles = { "karazhan", "kara ", " kara", "kara,", "kara.", "kara/", "/kara" },
+  },
+  { key = "Gruul's Lair", needles = { "gruul", "gruul's", "grull" } },
+  {
+    key = "Magtheridon",
+    needles = { "magtheridon", "magth", "maggy" },
+  },
+  {
+    key = "SSC",
+    needles = { "serpentshrine", "ssc ", " ssc", "vashj" },
+  },
+  {
+    key = "Tempest Keep",
+    needles = { "tempest keep", "the eye", "tk ", " tk,", " tk.", "kael'thas", "kaelthas" },
+  },
+  { key = "Hyjal", needles = { "hyjal", "mount hyjal", "archimonde" } },
+  {
+    key = "Black Temple",
+    needles = { "black temple", "bt ", " bt,", " bt.", "illidan" },
+  },
+  { key = "Zul'Aman", needles = { "zul'aman", "zul aman", "za ", " za,", " za." } },
+  {
+    key = "Sunwell Plateau",
+    needles = { "sunwell", "swp ", " swp", "kil'jaeden", "kiljaeden" },
+  },
+}
+
+-- Abreviações EN comuns de heroica no chat (além de "hc"/"heroic" + needle base).
+local TBC_HEROIC_EXTRA_NEEDLES = {
+  ["Hellfire Ramparts"] = { "hc ramps", "h ramps", "hramps", "hc ramparts", "h ramparts" },
+  ["Blood Furnace"] = { "hbf", "hc bf", "h bf", "hcbf", "hc furnace" },
+  ["Shattered Halls"] = { "hsh", "hc sh", "h sh", "hc shalls", "h shalls", "hc shattered", "h shattered" },
+  ["Slave Pens"] = { "hsp", "hc sp", "h sp", "hc pens", "h pens", "hc slave", "h slave" },
+  ["Underbog"] = { "hub", "hc ub", "h ub", "hc underbog", "h underbog" },
+  ["Steamvault"] = { "hsv", "hc sv", "h sv", "hc steam", "h steam" },
+  ["Mana-Tombs"] = { "hmt", "hc mt", "h mt", "hc mana", "h mana", "hc tombs", "h tombs" },
+  ["Auchenai Crypts"] = { "hac", "hc ac", "h ac", "hc auchenai", "h auchenai", "hc crypts" },
+  ["Sethekk Halls"] = { "hc sethekk", "h sethekk", "hc seth", "h seth" },
+  ["Shadow Labyrinth"] = { "hsl", "hc slab", "h slab", "hc shadow lab", "h shadow lab" },
+  ["Old Hillsbrad"] = { "hohb", "hc ohb", "h ohb", "hc hillsbrad", "h hillsbrad", "hc durnholde" },
+  ["Black Morass"] = { "hbm", "hc bm", "h bm", "hc morass", "h morass", "hc black morass" },
+  ["Magisters' Terrace"] = { "hmgt", "hc mgt", "h mgt", "hc magisters", "h magisters", "hc terrace", "h terrace" },
+  ["Mechanar"] = { "hc mech", "h mech", "hc mechanar", "h mechanar" },
+  ["Botanica"] = { "hc bot", "h bot", "hc botanica", "h botanica" },
+  ["Arcatraz"] = { "hc arc", "h arc", "hc arcatraz", "h arcatraz", "hc arca", "h arca" },
+}
+
+-- Só EN, como o restante do catálogo Classic (Termos / detecção).
+local HEROIC_CHAT_TOKENS = {
+  "hc",
+  "heroic",
+}
+
+local function buildTbcHeroicNeedles(baseNeedles, extra)
+  local out, seen = {}, {}
+  local function add(s)
+    if type(s) ~= "string" or s == "" or seen[s] then
+      return
+    end
+    seen[s] = true
+    out[#out + 1] = s
+  end
+  for _, n in ipairs(baseNeedles or {}) do
+    local t = tostring(n):match("^%s*(.-)%s*$") or ""
+    -- Evita combinar abreviações muito curtas ("bf") com todos os tokens.
+    if #t >= 4 then
+      for _, h in ipairs(HEROIC_CHAT_TOKENS) do
+        add(h .. " " .. t)
+        add(t .. " " .. h)
+      end
+    end
+  end
+  for _, e in ipairs(extra or {}) do
+    add(e)
+  end
+  return out
+end
+
+local TBC_HEROIC_ROWS = {}
+local TBC_HEROIC_KEYS = {}
+local TBC_HEROIC_BASE = {} -- heroicKey → normalKey
+
+for _, row in ipairs(TBC_DUNGEON_ROWS) do
+  local hKey = row.key .. " Heroic"
+  TBC_HEROIC_KEYS[hKey] = true
+  TBC_HEROIC_BASE[hKey] = row.key
+  TBC_HEROIC_ROWS[#TBC_HEROIC_ROWS + 1] = {
+    key = hKey,
+    needles = buildTbcHeroicNeedles(row.needles, TBC_HEROIC_EXTRA_NEEDLES[row.key]),
+  }
+end
+
+-- Lista unificada usada no merge de flavor (normal → heroica → raids).
+local TBC_INSTANCE_ROWS = {}
+for _, row in ipairs(TBC_DUNGEON_ROWS) do
+  TBC_INSTANCE_ROWS[#TBC_INSTANCE_ROWS + 1] = row
+end
+for _, row in ipairs(TBC_HEROIC_ROWS) do
+  TBC_INSTANCE_ROWS[#TBC_INSTANCE_ROWS + 1] = row
+end
+for _, row in ipairs(TBC_RAID_ROWS) do
+  TBC_INSTANCE_ROWS[#TBC_INSTANCE_ROWS + 1] = row
+end
+
+local TBC_RAIDS = {
+  ["Karazhan"] = true,
+  ["Gruul's Lair"] = true,
+  ["Magtheridon"] = true,
+  ["SSC"] = true,
+  ["Tempest Keep"] = true,
+  ["Hyjal"] = true,
+  ["Black Temple"] = true,
+  ["Zul'Aman"] = true,
+  ["Sunwell Plateau"] = true,
+}
+
+local TBC_INSTANCE_KEYS = {}
+for _, row in ipairs(TBC_INSTANCE_ROWS) do
+  TBC_INSTANCE_KEYS[row.key] = true
+end
+
+--- true se a chave pertence ao pack Outland / TBC Anniversary.
+function CEF.instanceKeyIsTbc(instanceKey)
+  return instanceKey ~= nil and TBC_INSTANCE_KEYS[instanceKey] == true
+end
+
+--- true se é masmorra heroica TBC (chave "… Heroic").
+function CEF.instanceKeyIsTbcHeroic(instanceKey)
+  return instanceKey ~= nil and TBC_HEROIC_KEYS[instanceKey] == true
+end
+
+--- Chave normal correspondente a uma heroica (ou nil).
+function CEF.tbcHeroicBaseKey(instanceKey)
+  return instanceKey and TBC_HEROIC_BASE[instanceKey] or nil
+end
+
+--- Chave heroica correspondente a uma masmorra TBC normal (ou nil).
+function CEF.tbcHeroicKeyFor(normalKey)
+  if not normalKey then
+    return nil
+  end
+  local h = normalKey .. " Heroic"
+  if TBC_HEROIC_KEYS[h] then
+    return h
+  end
+  return nil
+end
+
 local sodActiveCache = nil
+local tbcActiveCache = nil
+local INSTANCE_ROWS_MERGED = nil
+local INSTANCE_ROWS_MERGED_FLAVOR = nil
+
+--- Cap de nível do cliente (60 Era / 70 TBC).
+function CEF.getMaxPlayerLevel()
+  if GetMaxPlayerLevel then
+    local n = tonumber(GetMaxPlayerLevel())
+    if n and n > 0 then
+      return n
+    end
+  end
+  if CEF.isTbcActive and CEF.isTbcActive() then
+    return 70
+  end
+  return 60
+end
+
+--- true no cliente Burning Crusade Classic / TBC Anniversary.
+function CEF.isTbcActive()
+  if tbcActiveCache ~= nil then
+    return tbcActiveCache
+  end
+  if WOW_PROJECT_ID and WOW_PROJECT_BURNING_CRUSADE_CLASSIC then
+    tbcActiveCache = (WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC)
+    return tbcActiveCache
+  end
+  if GetBuildInfo then
+    local v = tostring(GetBuildInfo() or "")
+    local major = v:match("^(%d+)")
+    if major == "2" then
+      tbcActiveCache = true
+      return true
+    end
+    if major ~= nil then
+      tbcActiveCache = false
+      return false
+    end
+  end
+  return false
+end
 
 --- true em realm Season of Discovery (C_Seasons pode não estar pronto no load;
 --- só cacheia quando a API responde).
@@ -132,22 +376,50 @@ function CEF.isSoDActive()
   return sodActiveCache
 end
 
-local INSTANCE_ROWS_WITH_SOD = nil
+--- Invalida caches de flavor (chamar no PLAYER_LOGIN).
+function CEF.invalidateFlavorCaches()
+  sodActiveCache = nil
+  tbcActiveCache = nil
+  INSTANCE_ROWS_MERGED = nil
+  INSTANCE_ROWS_MERGED_FLAVOR = nil
+  if CEF.invalidateInstanceNameLookup then
+    CEF.invalidateInstanceNameLookup()
+  end
+end
+
+local function flavorKey()
+  local parts = { "v" }
+  if CEF.isSoDActive() then
+    parts[#parts + 1] = "sod"
+  end
+  if CEF.isTbcActive() then
+    parts[#parts + 1] = "tbc"
+  end
+  return table.concat(parts, ":")
+end
 
 local function activeInstanceRows()
-  if not CEF.isSoDActive() then
-    return INSTANCE_ROWS
+  local fk = flavorKey()
+  if INSTANCE_ROWS_MERGED and INSTANCE_ROWS_MERGED_FLAVOR == fk then
+    return INSTANCE_ROWS_MERGED
   end
-  if not INSTANCE_ROWS_WITH_SOD then
-    INSTANCE_ROWS_WITH_SOD = {}
-    for i, row in ipairs(INSTANCE_ROWS) do
-      INSTANCE_ROWS_WITH_SOD[i] = row
-    end
+  local rows = {}
+  for i, row in ipairs(INSTANCE_ROWS) do
+    rows[i] = row
+  end
+  if CEF.isSoDActive() then
     for _, row in ipairs(SOD_INSTANCE_ROWS) do
-      INSTANCE_ROWS_WITH_SOD[#INSTANCE_ROWS_WITH_SOD + 1] = row
+      rows[#rows + 1] = row
     end
   end
-  return INSTANCE_ROWS_WITH_SOD
+  if CEF.isTbcActive() then
+    for _, row in ipairs(TBC_INSTANCE_ROWS) do
+      rows[#rows + 1] = row
+    end
+  end
+  INSTANCE_ROWS_MERGED = rows
+  INSTANCE_ROWS_MERGED_FLAVOR = fk
+  return rows
 end
 
 -- Raids (Classic Era); o restante em INSTANCE_ROWS conta como masmorra no filtro.
@@ -165,7 +437,13 @@ local function keyIsRaid(instanceKey)
   if INSTANCE_RAIDS[instanceKey] then
     return true
   end
-  return CEF.isSoDActive() and SOD_RAIDS[instanceKey] == true
+  if CEF.isSoDActive() and SOD_RAIDS[instanceKey] then
+    return true
+  end
+  if CEF.isTbcActive() and TBC_RAIDS[instanceKey] then
+    return true
+  end
+  return false
 end
 
 -- Faixa de níveis recomendada (Classic Era / vanilla); só para referência na UI.
@@ -188,8 +466,16 @@ local INSTANCE_LEVEL_RANGE = {
   ["Maraudon"] = "46-55",
   ["Sunken Temple"] = "50-60",
   ["Blackrock Depths"] = "52-60",
-  ["Dire Maul"] = "56-60",
+  ["DM East"] = "55-60",
+  ["DM West"] = "57-60",
+  ["DM North"] = "57-60",
   ["Scholomance"] = "58-60",
+  ["Strat Live"] = "58-60",
+  ["Strat UD"] = "58-60",
+  ["LBRS"] = "55-60",
+  ["UBRS"] = "58-60",
+  -- Legado (entradas antigas no histórico salvo ainda usam as chaves genéricas).
+  ["Dire Maul"] = "56-60",
   ["Stratholme"] = "58-60",
   ["Blackrock Spire"] = "55-60",
   ["Zul'Gurub"] = "60",
@@ -203,6 +489,48 @@ local INSTANCE_LEVEL_RANGE = {
   ["Demon Fall Canyon"] = "55-60",
   ["Karazhan Crypts"] = "60",
   ["Scarlet Enclave"] = "60",
+  -- TBC / Outland (só com CEF.isTbcActive()).
+  ["Hellfire Ramparts"] = "58-62",
+  ["Blood Furnace"] = "59-63",
+  ["Slave Pens"] = "60-64",
+  ["Underbog"] = "61-65",
+  ["Mana-Tombs"] = "62-66",
+  ["Auchenai Crypts"] = "63-67",
+  ["Old Hillsbrad"] = "64-68",
+  ["Sethekk Halls"] = "65-69",
+  ["Shadow Labyrinth"] = "67-70",
+  ["Steamvault"] = "67-70",
+  ["Shattered Halls"] = "67-70",
+  ["Black Morass"] = "68-70",
+  ["Magisters' Terrace"] = "68-70",
+  ["Mechanar"] = "69-70",
+  ["Botanica"] = "70",
+  ["Arcatraz"] = "70",
+  ["Hellfire Ramparts Heroic"] = "70",
+  ["Blood Furnace Heroic"] = "70",
+  ["Shattered Halls Heroic"] = "70",
+  ["Slave Pens Heroic"] = "70",
+  ["Underbog Heroic"] = "70",
+  ["Steamvault Heroic"] = "70",
+  ["Mana-Tombs Heroic"] = "70",
+  ["Auchenai Crypts Heroic"] = "70",
+  ["Sethekk Halls Heroic"] = "70",
+  ["Shadow Labyrinth Heroic"] = "70",
+  ["Old Hillsbrad Heroic"] = "70",
+  ["Black Morass Heroic"] = "70",
+  ["Magisters' Terrace Heroic"] = "70",
+  ["Mechanar Heroic"] = "70",
+  ["Botanica Heroic"] = "70",
+  ["Arcatraz Heroic"] = "70",
+  ["Karazhan"] = "70",
+  ["Gruul's Lair"] = "70",
+  ["Magtheridon"] = "70",
+  ["SSC"] = "70",
+  ["Tempest Keep"] = "70",
+  ["Hyjal"] = "70",
+  ["Black Temple"] = "70",
+  ["Zul'Aman"] = "70",
+  ["Sunwell Plateau"] = "70",
 }
 
 -- Nomes oficiais Blizzard (AreaTable / LFG), nunca tradução manual.
@@ -227,10 +555,15 @@ local INSTANCE_BLIZZARD_IDS = {
   ["Maraudon"] = { areaId = 2100, lfgId = 26 },
   ["Sunken Temple"] = { areaId = 1477, lfgId = 28 },
   ["Blackrock Depths"] = { areaId = 1584, lfgId = 30 },
-  ["Blackrock Spire"] = { areaId = 1583, lfgId = 32 },
-  ["Dire Maul"] = { areaId = 2557, lfgId = 34 },
+  -- Alas/lados: sem areaId (AreaTable só tem o nome genérico); LFG dá o nome exato.
+  ["LBRS"] = { lfgId = 32, lfgPrefer = true },
+  ["UBRS"] = { areaId = 1583 },
+  ["DM East"] = { lfgId = 34, lfgPrefer = true },
+  ["DM West"] = { lfgId = 36, lfgPrefer = true },
+  ["DM North"] = { lfgId = 38, lfgPrefer = true },
   ["Scholomance"] = { areaId = 2057, lfgId = 2 },
-  ["Stratholme"] = { areaId = 2017, lfgId = 40 },
+  ["Strat Live"] = { lfgId = 40, lfgPrefer = true },
+  ["Strat UD"] = { lfgId = 274, lfgPrefer = true },
   ["Zul'Gurub"] = { areaId = 1977, lfgId = 42 },
   ["Molten Core"] = { areaId = 2717, lfgId = 48 },
   ["Onyxia"] = { areaId = 2159, lfgId = 46 },
@@ -242,6 +575,48 @@ local INSTANCE_BLIZZARD_IDS = {
   ["Demon Fall Canyon"] = { areaId = 15475 },
   ["Karazhan Crypts"] = { areaId = 16074 },
   ["Scarlet Enclave"] = { areaId = 16236 },
+  -- TBC / Outland (AreaTable 2.5.x)
+  ["Hellfire Ramparts"] = { areaId = 3562 },
+  ["Blood Furnace"] = { areaId = 3713 },
+  ["Shattered Halls"] = { areaId = 3714 },
+  ["Slave Pens"] = { areaId = 3717 },
+  ["Underbog"] = { areaId = 3716 },
+  ["Steamvault"] = { areaId = 3715 },
+  ["Mana-Tombs"] = { areaId = 3792 },
+  ["Auchenai Crypts"] = { areaId = 3790 },
+  ["Sethekk Halls"] = { areaId = 3791 },
+  ["Shadow Labyrinth"] = { areaId = 3789 },
+  ["Old Hillsbrad"] = { areaId = 2367 },
+  ["Black Morass"] = { areaId = 2366 },
+  ["Magisters' Terrace"] = { areaId = 4131 },
+  ["Mechanar"] = { areaId = 3849 },
+  ["Botanica"] = { areaId = 3847 },
+  ["Arcatraz"] = { areaId = 3848 },
+  ["Hellfire Ramparts Heroic"] = { areaId = 3562 },
+  ["Blood Furnace Heroic"] = { areaId = 3713 },
+  ["Shattered Halls Heroic"] = { areaId = 3714 },
+  ["Slave Pens Heroic"] = { areaId = 3717 },
+  ["Underbog Heroic"] = { areaId = 3716 },
+  ["Steamvault Heroic"] = { areaId = 3715 },
+  ["Mana-Tombs Heroic"] = { areaId = 3792 },
+  ["Auchenai Crypts Heroic"] = { areaId = 3790 },
+  ["Sethekk Halls Heroic"] = { areaId = 3791 },
+  ["Shadow Labyrinth Heroic"] = { areaId = 3789 },
+  ["Old Hillsbrad Heroic"] = { areaId = 2367 },
+  ["Black Morass Heroic"] = { areaId = 2366 },
+  ["Magisters' Terrace Heroic"] = { areaId = 4131 },
+  ["Mechanar Heroic"] = { areaId = 3849 },
+  ["Botanica Heroic"] = { areaId = 3847 },
+  ["Arcatraz Heroic"] = { areaId = 3848 },
+  ["Karazhan"] = { areaId = 2562 },
+  ["Gruul's Lair"] = { areaId = 3618 },
+  ["Magtheridon"] = { areaId = 3836 },
+  ["SSC"] = { areaId = 3607 },
+  ["Tempest Keep"] = { areaId = 3845 },
+  ["Hyjal"] = { areaId = 3606 },
+  ["Black Temple"] = { areaId = 3959 },
+  ["Zul'Aman"] = { areaId = 3805 },
+  ["Sunwell Plateau"] = { areaId = 4075 },
 }
 
 local displayNameCache = {}
@@ -339,6 +714,187 @@ end
 
 function CEF.clearInstanceDisplayNameCache()
   wipe(displayNameCache)
+  if CEF.invalidateInstanceNameLookup then
+    CEF.invalidateInstanceNameLookup()
+  end
+end
+
+-- Lookup O(1) nome → key: só locale ativo do addon + locale do cliente + enUS.
+-- (Não indexa os 11 packs — desnecessário e mais lento.)
+local instanceNameLookup = nil
+local instanceNameLookupLocale = nil
+local instanceNameResolveMemo = {}
+
+function CEF.invalidateInstanceNameLookup()
+  instanceNameLookup = nil
+  instanceNameLookupLocale = nil
+  wipe(instanceNameResolveMemo)
+end
+
+local function activeLocaleForLookup()
+  if CEF.Locale and CEF.Locale.getActiveCode then
+    local code = CEF.Locale.getActiveCode()
+    if type(code) == "string" and code ~= "" then
+      return code
+    end
+  end
+  return (GetLocale and GetLocale()) or "enUS"
+end
+
+local function addPackToLookup(lookup, pack)
+  if type(pack) ~= "table" then
+    return
+  end
+  for key, localized in pairs(pack) do
+    lookup[strlower(tostring(key))] = key
+    if type(localized) == "string" and localized ~= "" then
+      lookup[strlower(localized)] = key
+    end
+  end
+end
+
+local function ensureInstanceNameLookup()
+  local active = activeLocaleForLookup()
+  local client = (GetLocale and GetLocale()) or active
+  local stamp = active .. "\0" .. client
+  if instanceNameLookup and instanceNameLookupLocale == stamp then
+    return instanceNameLookup
+  end
+
+  local lookup = {}
+  for key in pairs(INSTANCE_LEVEL_RANGE) do
+    lookup[strlower(tostring(key))] = key
+  end
+  for _, row in ipairs(activeInstanceRows()) do
+    if row.key then
+      lookup[strlower(row.key)] = row.key
+    end
+  end
+
+  local packs = CEF.INSTANCE_DISPLAY_NAMES
+  if type(packs) == "table" then
+    -- Sempre enUS (chaves/aliases EN + nomes Blizzard em inglês).
+    addPackToLookup(lookup, packs.enUS)
+    -- Locale do addon (UI / Termos).
+    if active ~= "enUS" then
+      addPackToLookup(lookup, packs[active])
+    end
+    -- Locale do cliente (nomes vindos de C_LFGList / GetLFGDungeonInfo).
+    if client ~= "enUS" and client ~= active then
+      addPackToLookup(lookup, packs[client])
+    end
+  end
+
+  instanceNameLookup = lookup
+  instanceNameLookupLocale = stamp
+  wipe(instanceNameResolveMemo)
+  return lookup
+end
+
+local function looksHeroicActivityName(lower)
+  return lower:find("heroic", 1, true)
+    or lower:find("(h)", 1, true)
+    or lower:find("heroico", 1, true)
+    or lower:find("heroica", 1, true)
+    or lower:find("héroïque", 1, true)
+    or lower:find("heroisch", 1, true)
+    or lower:find("eroica", 1, true)
+    or lower:find("героик", 1, true)
+    or lower:find("영웅", 1, true)
+    or lower:find("英雄", 1, true)
+end
+
+local function stripHeroicMarkers(lower)
+  return (lower
+    :gsub("%(%s*heroic%s*%)", " ")
+    :gsub("%(%s*heroico%s*%)", " ")
+    :gsub("%(%s*heroica%s*%)", " ")
+    :gsub("%(%s*héroïque%s*%)", " ")
+    :gsub("%(%s*heroisch%s*%)", " ")
+    :gsub("%(%s*eroica%s*%)", " ")
+    :gsub("%(%s*h%s*%)", " ")
+    :gsub("heroic[:%s%-]*", " ")
+    :gsub("heroico", " ")
+    :gsub("heroica", " ")
+    :gsub("héroïque", " ")
+    :gsub("heroisch", " ")
+    :gsub("eroica", " ")
+    :gsub("%s+", " ")
+    :match("^%s*(.-)%s*$")) or lower
+end
+
+--- Resolve chave EN a partir do nome Blizzard/UI (rápido + memoizado).
+function CEF.resolveInstanceKeyFromName(name)
+  if type(name) ~= "string" or name == "" then
+    return nil
+  end
+  local lower = strlower(name)
+  local memo = instanceNameResolveMemo[lower]
+  if memo ~= nil then
+    if memo == false then
+      return nil
+    end
+    return memo
+  end
+
+  local lookup = ensureInstanceNameLookup()
+  local key = lookup[lower]
+  if key then
+    instanceNameResolveMemo[lower] = key
+    return key
+  end
+
+  local heroic = looksHeroicActivityName(lower)
+  if heroic then
+    local stripped = stripHeroicMarkers(lower)
+    if stripped and stripped ~= "" and stripped ~= lower then
+      local base = lookup[stripped]
+      if base then
+        local hKey = CEF.tbcHeroicKeyFor and CEF.tbcHeroicKeyFor(base)
+        key = hKey or base
+        instanceNameResolveMemo[lower] = key
+        return key
+      end
+      -- Prefixo Blizzard "Bastilha da Tormenta - Arcatraz (Heroico)" → tenta só o sufixo.
+      local tail = stripped:match("[-–:]%s*(.+)$")
+      if tail and #tail >= 4 then
+        base = lookup[tail]
+        if not base then
+          for cand, mapped in pairs(lookup) do
+            if #cand >= 4 and (tail:find(cand, 1, true) or cand:find(tail, 1, true)) then
+              if not CEF.instanceKeyIsRaid or not CEF.instanceKeyIsRaid(mapped) then
+                base = mapped
+                break
+              end
+            end
+          end
+        end
+        if base then
+          local hKey = CEF.tbcHeroicKeyFor and CEF.tbcHeroicKeyFor(base)
+          key = hKey or base
+          instanceNameResolveMemo[lower] = key
+          return key
+        end
+      end
+    end
+  end
+
+  -- Parcial limitado (maior substring), só se exacto falhar.
+  local bestKey, bestLen = nil, 0
+  local nameLen = #lower
+  local minLen = math.max(8, math.floor(nameLen * 0.7))
+  for cand, mapped in pairs(lookup) do
+    local cl = #cand
+    if cl >= minLen and cl > bestLen and lower:find(cand, 1, true) then
+      bestKey = mapped
+      bestLen = cl
+    end
+  end
+  if bestKey and heroic and CEF.tbcHeroicKeyFor then
+    bestKey = CEF.tbcHeroicKeyFor(bestKey) or bestKey
+  end
+  instanceNameResolveMemo[lower] = bestKey or false
+  return bestKey
 end
 
 -- Chave especial do filtro: só instâncias cujo range recomendado inclui o nível do jogador.
@@ -400,52 +956,77 @@ local function instanceMinLevelForSort(instanceKey)
 end
 
 -- Entradas do menu do filtro: opção (key false = todas) ou cabeçalho de secção.
--- Reconstruído no PLAYER_LOGIN: em SoD entram as instâncias exclusivas e
--- BFD/Gnomer/ST mudam para a secção de raids.
+-- Reconstruído no PLAYER_LOGIN: em SoD entram as instâncias exclusivas;
+-- no TBC, Classic e Outland ficam em secções separadas (masmorras + raids).
 CEF.INSTANCE_FILTER_MENU_OPTS = {}
 
+local function sortInstanceKeysByLevel(list)
+  table.sort(list, function(a, b)
+    local ka, kb = instanceMinLevelForSort(a), instanceMinLevelForSort(b)
+    if ka ~= kb then
+      return ka < kb
+    end
+    return strlower(a) < strlower(b)
+  end)
+end
+
+local function appendFilterSection(opts, textKey, keys)
+  if not keys or #keys == 0 then
+    return
+  end
+  opts[#opts + 1] = { kind = "hdr", textKey = textKey }
+  for _, k in ipairs(keys) do
+    opts[#opts + 1] = { kind = "opt", key = k }
+  end
+end
+
 function CEF.rebuildInstanceFilterMenuOpts()
-  local dungeons, raids = {}, {}
+  local classicD, classicR, tbcD, tbcH, tbcR = {}, {}, {}, {}, {}
   local seen = {}
+  local splitTbc = CEF.isTbcActive()
   for _, row in ipairs(activeInstanceRows()) do
     local k = row.key
     if not seen[k] then
       seen[k] = true
-      if keyIsRaid(k) then
-        raids[#raids + 1] = k
+      local isTbc = splitTbc and TBC_INSTANCE_KEYS[k]
+      local isRaid = keyIsRaid(k)
+      if isTbc then
+        if isRaid then
+          tbcR[#tbcR + 1] = k
+        elseif TBC_HEROIC_KEYS[k] then
+          tbcH[#tbcH + 1] = k
+        else
+          tbcD[#tbcD + 1] = k
+        end
       else
-        dungeons[#dungeons + 1] = k
+        if isRaid then
+          classicR[#classicR + 1] = k
+        else
+          classicD[#classicD + 1] = k
+        end
       end
     end
   end
 
-  table.sort(dungeons, function(a, b)
-    local ka, kb = instanceMinLevelForSort(a), instanceMinLevelForSort(b)
-    if ka ~= kb then
-      return ka < kb
-    end
-    return strlower(a) < strlower(b)
-  end)
-
-  table.sort(raids, function(a, b)
-    local ka, kb = instanceMinLevelForSort(a), instanceMinLevelForSort(b)
-    if ka ~= kb then
-      return ka < kb
-    end
-    return strlower(a) < strlower(b)
-  end)
+  sortInstanceKeysByLevel(classicD)
+  sortInstanceKeysByLevel(classicR)
+  sortInstanceKeysByLevel(tbcD)
+  sortInstanceKeysByLevel(tbcH)
+  sortInstanceKeysByLevel(tbcR)
 
   local opts = CEF.INSTANCE_FILTER_MENU_OPTS
   wipe(opts)
   opts[#opts + 1] = { kind = "opt", key = false }
   opts[#opts + 1] = { kind = "opt", key = CEF.FILTER_INSTANCE_MY_LEVEL }
-  opts[#opts + 1] = { kind = "hdr", textKey = "CATEGORY_DUNGEONS" }
-  for _, k in ipairs(dungeons) do
-    opts[#opts + 1] = { kind = "opt", key = k }
-  end
-  opts[#opts + 1] = { kind = "hdr", textKey = "CATEGORY_RAIDS" }
-  for _, k in ipairs(raids) do
-    opts[#opts + 1] = { kind = "opt", key = k }
+  if splitTbc then
+    appendFilterSection(opts, "CATEGORY_CLASSIC_DUNGEONS", classicD)
+    appendFilterSection(opts, "CATEGORY_CLASSIC_RAIDS", classicR)
+    appendFilterSection(opts, "CATEGORY_TBC_DUNGEONS", tbcD)
+    appendFilterSection(opts, "CATEGORY_TBC_HEROIC_DUNGEONS", tbcH)
+    appendFilterSection(opts, "CATEGORY_TBC_RAIDS", tbcR)
+  else
+    appendFilterSection(opts, "CATEGORY_DUNGEONS", classicD)
+    appendFilterSection(opts, "CATEGORY_RAIDS", classicR)
   end
 end
 
@@ -455,13 +1036,17 @@ CEF.rebuildInstanceFilterMenuOpts()
 local COLOR_LVL_ORANGE_MIN = "|cffff9933"
 local COLOR_LVL_GREEN_MAX = "|cff33cc33"
 
--- Nome da instância: masmorra (azul-claro) vs raid (âmbar), alinhado a INSTANCE_RAIDS.
+-- Nome da instância: masmorra (azul-claro), heroica TBC (violeta), raid (âmbar).
 local COLOR_INSTANCE_DUNGEON_NAME = "|cff9fd3ff"
+local COLOR_INSTANCE_HEROIC_NAME = "|cffe59cff"
 local COLOR_INSTANCE_RAID_NAME = "|cffffb74d"
 
 local function instanceNameRichOpenTag(instanceKey)
   if instanceKey and keyIsRaid(instanceKey) then
     return COLOR_INSTANCE_RAID_NAME
+  end
+  if instanceKey and TBC_HEROIC_KEYS[instanceKey] then
+    return COLOR_INSTANCE_HEROIC_NAME
   end
   return COLOR_INSTANCE_DUNGEON_NAME
 end
@@ -520,25 +1105,33 @@ function CEF.formatLevelBoundsRichText(minV, maxV)
   return formatLevelRangeColored(minV .. "-" .. maxV)
 end
 
+--- Nome + níveis no estilo da coluna Chat (azul/âmbar + laranja/verde).
+--- instanceKey opcional: se existir, usa o range recomendado da tabela do addon.
+function CEF.activityNameLevelsRichText(displayName, minV, maxV, instanceKey)
+  displayName = tostring(displayName or "")
+  if displayName == "" then
+    return "—"
+  end
+  local namePart = instanceNameRichOpenTag(instanceKey) .. displayName .. "|r"
+  local levels
+  if instanceKey then
+    levels = recommendedLevelRichText(instanceKey)
+  end
+  if (not levels or levels == "—") and minV then
+    levels = CEF.formatLevelBoundsRichText(minV, maxV)
+  end
+  if levels and levels ~= "—" then
+    return namePart .. "  " .. levels
+  end
+  return namePart
+end
+
 --- Resolve min/max recomendados a partir do nome localizado da atividade LFG.
 function CEF.levelBoundsForDisplayName(activityName)
   if type(activityName) ~= "string" or activityName == "" then
     return nil, nil
   end
-  local exactKey, partialKey = nil, nil
-  for key in pairs(INSTANCE_LEVEL_RANGE) do
-    local dn = CEF.getInstanceDisplayName(key)
-    if type(dn) == "string" and dn ~= "" then
-      if dn == activityName then
-        exactKey = key
-        break
-      end
-      if not partialKey and (activityName:find(dn, 1, true) or dn:find(activityName, 1, true)) then
-        partialKey = key
-      end
-    end
-  end
-  local key = exactKey or partialKey
+  local key = CEF.resolveInstanceKeyFromName and CEF.resolveInstanceKeyFromName(activityName)
   if not key then
     return nil, nil
   end
@@ -547,16 +1140,29 @@ end
 
 -- Linhas de deteção agrupadas (mesma ordem que o menu de filtro).
 function CEF.getInstanceDetectionRowsGroupedSorted()
-  local d, r = {}, {}
+  local classicD, classicR, tbcD, tbcH, tbcR = {}, {}, {}, {}, {}
   local seen = {}
+  local splitTbc = CEF.isTbcActive()
   for _, row in ipairs(activeInstanceRows()) do
     local k = row.key
     if not seen[k] then
       seen[k] = true
-      if keyIsRaid(k) then
-        r[#r + 1] = row
+      local isTbc = splitTbc and TBC_INSTANCE_KEYS[k]
+      local isRaid = keyIsRaid(k)
+      if isTbc then
+        if isRaid then
+          tbcR[#tbcR + 1] = row
+        elseif TBC_HEROIC_KEYS[k] then
+          tbcH[#tbcH + 1] = row
+        else
+          tbcD[#tbcD + 1] = row
+        end
       else
-        d[#d + 1] = row
+        if isRaid then
+          classicR[#classicR + 1] = row
+        else
+          classicD[#classicD + 1] = row
+        end
       end
     end
   end
@@ -567,9 +1173,21 @@ function CEF.getInstanceDetectionRowsGroupedSorted()
     end
     return strlower(a.key) < strlower(b.key)
   end
-  table.sort(d, sortFn)
-  table.sort(r, sortFn)
-  return { dungeons = d, raids = r }
+  table.sort(classicD, sortFn)
+  table.sort(classicR, sortFn)
+  table.sort(tbcD, sortFn)
+  table.sort(tbcH, sortFn)
+  table.sort(tbcR, sortFn)
+  return {
+    splitTbc = splitTbc,
+    dungeons = classicD,
+    raids = classicR,
+    classicDungeons = classicD,
+    classicRaids = classicR,
+    tbcDungeons = tbcD,
+    tbcHeroicDungeons = tbcH,
+    tbcRaids = tbcR,
+  }
 end
 
 function CEF.instanceFilterOptionRichText(instKeyOrSet)
@@ -680,6 +1298,24 @@ local function direMaulIsolatedDmPos(lower)
   return nil
 end
 
+-- Masmorras com alas/lados: menção genérica (sem ala) → expande para todas as alas,
+-- igual à regra do Monastério Escarlate. Ex.: «LF2M strat» → Strat Live + Strat UD.
+local GENERIC_WING_GROUPS = {
+  {
+    keys = { "Strat Live", "Strat UD" },
+    needles = { "stratholme", "strat ", " strat", "strat(", "strat)", "strat,", "strat.", "strat-" },
+  },
+  {
+    keys = { "DM East", "DM West", "DM North" },
+    needles = { "dire maul", " dm ", "-> dm", "> dm ", "^dm ", " dm,", " dm.", " dm/", "/dm " },
+    useIsolatedDm = true,
+  },
+  {
+    keys = { "LBRS", "UBRS" },
+    needles = { "blackrock spire", " brs", "brs " },
+  },
+}
+
 -- «WC» como Wailing Caverns no fim (ex.: «LF1M DPS WC») ou só «wc» + separador.
 local function wailingCavernsIsolatedWcPos(lower)
   local t = lower:match("^%s*(.-)%s*$") or lower
@@ -723,10 +1359,31 @@ function CEF.detectInstances(text)
     end
   end
 
-  if not hits["Dire Maul"] then
-    local pDm = direMaulIsolatedDmPos(lower)
-    if pDm then
-      hits["Dire Maul"] = pDm
+  -- Alas: menção genérica sem ala específica → todas as alas na posição do match.
+  for _, grp in ipairs(GENERIC_WING_GROUPS) do
+    local hasWing = false
+    for _, k in ipairs(grp.keys) do
+      if hits[k] then
+        hasWing = true
+        break
+      end
+    end
+    if not hasWing then
+      local bestPos
+      for _, n in ipairs(grp.needles) do
+        local pos = lower:find(n, 1, true)
+        if pos and (not bestPos or pos < bestPos) then
+          bestPos = pos
+        end
+      end
+      if not bestPos and grp.useIsolatedDm then
+        bestPos = direMaulIsolatedDmPos(lower)
+      end
+      if bestPos then
+        for _, k in ipairs(grp.keys) do
+          hits[k] = bestPos
+        end
+      end
     end
   end
 
@@ -734,6 +1391,13 @@ function CEF.detectInstances(text)
     local pWc = wailingCavernsIsolatedWcPos(lower)
     if pWc then
       hits["Wailing Caverns"] = pWc
+    end
+  end
+
+  -- Heroica TBC ganha da Normal: "hc ramps" não deve listar também Ramparts normal.
+  for hKey, baseKey in pairs(TBC_HEROIC_BASE) do
+    if hits[hKey] and hits[baseKey] then
+      hits[baseKey] = nil
     end
   end
 
@@ -840,11 +1504,31 @@ end
 function CEF.entryInstancesSearchBlob(e)
   local list = entryInstancesList(e)
   if #list == 0 then
-    return strlower(e.instance or "")
+    local fallback = e.instance or ""
+    return strlower(fallback)
   end
   local parts = {}
   for _, k in ipairs(list) do
     parts[#parts + 1] = strlower(k)
+    local display = CEF.getInstanceDisplayName and CEF.getInstanceDisplayName(k)
+    if type(display) == "string" and display ~= "" and display ~= k then
+      parts[#parts + 1] = strlower(display)
+    end
+  end
+  return table.concat(parts, " ")
+end
+
+--- Texto pesquisável de uma instância (chave EN + nome no locale do addon).
+function CEF.instanceSearchHay(instanceKey)
+  if type(instanceKey) ~= "string" or instanceKey == "" then
+    return ""
+  end
+  local parts = { strlower(instanceKey) }
+  local display = CEF.getInstanceDisplayName and CEF.getInstanceDisplayName(instanceKey)
+  if type(display) == "string" and display ~= "" then
+    -- Remove códigos de cor caso o nome venha “rico”.
+    display = display:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    parts[#parts + 1] = strlower(display)
   end
   return table.concat(parts, " ")
 end

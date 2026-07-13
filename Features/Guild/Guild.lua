@@ -90,7 +90,7 @@ local function ensureGuildFilterState()
     s.filterGuildLevelMin = 1
   end
   if s.filterGuildLevelMax == nil then
-    s.filterGuildLevelMax = 60
+    s.filterGuildLevelMax = (CEF.getMaxPlayerLevel and CEF.getMaxPlayerLevel()) or 60
   end
 end
 
@@ -376,7 +376,7 @@ local function memberMatchesFilters(m, s)
   end
 
   local minL = tonumber(s.filterGuildLevelMin) or 1
-  local maxL = tonumber(s.filterGuildLevelMax) or 60
+  local maxL = tonumber(s.filterGuildLevelMax) or (CEF.getMaxPlayerLevel and CEF.getMaxPlayerLevel()) or 60
   if minL > maxL then
     minL, maxL = maxL, minL
   end
@@ -444,7 +444,7 @@ function Guild.resetFilters()
   s.filterGuildRankKeys = CEF.filterSetClear()
   s.filterGuildOnlineKey = false
   s.filterGuildLevelMin = 1
-  s.filterGuildLevelMax = 60
+  s.filterGuildLevelMax = (CEF.getMaxPlayerLevel and CEF.getMaxPlayerLevel()) or 60
   Guild.resetSort()
   Guild.rebuildFilteredView()
 end

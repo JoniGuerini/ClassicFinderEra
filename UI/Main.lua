@@ -19,7 +19,8 @@ function CEF.UI.createMainUI()
 
   -- Dimensões do painel de filtros/dropdowns (mantidas iguais ao código anterior)
   local FILTER_MENU_ROW_H = 22
-  local FILTER_MENU_MAX_ROWS = 40
+  -- Classic + TBC normal/heroic/raids + cabeçalhos; precisa de folga.
+  local FILTER_MENU_MAX_ROWS = 130
   local INTENT_FILTER_MENU_MAX_ROWS = 8
   local ROLE_FILTER_MENU_MAX_ROWS = 8
   local FILTER_INSTANCE_DROPDOWN_W = 196
@@ -287,8 +288,43 @@ function CEF.UI.createMainUI()
   mr:SetPoint("TOPRIGHT", filterMenu, "TOPRIGHT", 0, 0)
   mr:SetPoint("BOTTOMRIGHT", filterMenu, "BOTTOMRIGHT", 0, 0)
 
+  local FILTER_MENU_SEARCH_H = 22
+  local filterMenuSearchQ = ""
+  local mSearchBorder = CreateFrame("Frame", nil, filterMenu)
+  mSearchBorder:SetHeight(FILTER_MENU_SEARCH_H)
+  mSearchBorder:SetPoint("TOPLEFT", filterMenu, "TOPLEFT", 6, -6)
+  mSearchBorder:SetPoint("TOPRIGHT", filterMenu, "TOPRIGHT", -6, -6)
+  local mSearchBg = mSearchBorder:CreateTexture(nil, "BACKGROUND")
+  mSearchBg:SetAllPoints()
+  mSearchBg:SetColorTexture(0.1, 0.09, 0.08, 1)
+  local mSearchPh = mSearchBorder:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+  mSearchPh:SetPoint("LEFT", mSearchBorder, "LEFT", 6, 0)
+  mSearchPh:SetPoint("RIGHT", mSearchBorder, "RIGHT", -6, 0)
+  mSearchPh:SetJustifyH("LEFT")
+  mSearchPh:SetText(CEF.L.FILTER_INSTANCE_SEARCH or "Search instance…")
+  local mSearchEdit = CreateFrame("EditBox", nil, mSearchBorder)
+  mSearchEdit:SetFontObject(GameFontHighlightSmall)
+  mSearchEdit:SetPoint("TOPLEFT", mSearchBorder, "TOPLEFT", 4, -2)
+  mSearchEdit:SetPoint("BOTTOMRIGHT", mSearchBorder, "BOTTOMRIGHT", -4, 2)
+  mSearchEdit:SetAutoFocus(false)
+  mSearchEdit:SetScript("OnEscapePressed", function(self)
+    self:ClearFocus()
+  end)
+  local function updateFilterMenuSearchPh()
+    local tx = mSearchEdit:GetText() or ""
+    if tx == "" and not mSearchEdit:HasFocus() then
+      mSearchPh:Show()
+    else
+      mSearchPh:Hide()
+    end
+  end
+  mSearchEdit:SetScript("OnEditFocusGained", updateFilterMenuSearchPh)
+  mSearchEdit:SetScript("OnEditFocusLost", updateFilterMenuSearchPh)
+  f.filterInstanceSearchEdit = mSearchEdit
+  f.filterInstanceSearchPlaceholder = mSearchPh
+
   local mScroll = CreateFrame("ScrollFrame", nil, filterMenu)
-  mScroll:SetPoint("TOPLEFT", filterMenu, "TOPLEFT", 4, -4)
+  mScroll:SetPoint("TOPLEFT", filterMenu, "TOPLEFT", 4, -(8 + FILTER_MENU_SEARCH_H))
   mScroll:SetPoint("BOTTOMRIGHT", filterMenu, "BOTTOMRIGHT", -4, 4)
   mScroll:EnableMouse(true)
   local mChild = CreateFrame("Frame", nil, mScroll)
@@ -366,7 +402,44 @@ function CEF.UI.createMainUI()
     filterMenu:SetWidth(dropBtn:GetWidth())
     local mw = filterMenu:GetWidth()
     local labelW = math.max(40, mw - CEF.UIFilters.filterCheckLabelLeft() - 8)
-    local opts = CEF.INSTANCE_FILTER_MENU_OPTS
+    local allOpts = CEF.INSTANCE_FILTER_MENU_OPTS or {}
+    local q = filterMenuSearchQ
+    local opts = allOpts
+    if q ~= "" then
+      opts = {}
+      local pendingHdr = nil
+      local myLvl = CEF.FILTER_INSTANCE_MY_LEVEL
+      for _, entry in ipairs(allOpts) do
+        if entry.kind == "hdr" then
+          pendingHdr = entry
+        else
+          local keep = false
+          if entry.key == false or entry.key == nil or entry.key == myLvl then
+            keep = true
+          else
+            local hay = ""
+            if type(entry.key) == "string" then
+              if CEF.instanceSearchHay then
+                hay = CEF.instanceSearchHay(entry.key)
+              else
+                hay = strlower(entry.key)
+                if CEF.getInstanceDisplayName then
+                  hay = hay .. " " .. strlower(tostring(CEF.getInstanceDisplayName(entry.key) or ""))
+                end
+              end
+            end
+            keep = hay:find(q, 1, true) ~= nil
+          end
+          if keep then
+            if pendingHdr then
+              opts[#opts + 1] = pendingHdr
+              pendingHdr = nil
+            end
+            opts[#opts + 1] = entry
+          end
+        end
+      end
+    end
     local selected = st().filterInstanceKeys
     local y = 0
     for i = 1, FILTER_MENU_MAX_ROWS do
@@ -408,7 +481,7 @@ function CEF.UI.createMainUI()
     mChild:SetWidth(math.max(1, mw - 8))
     mChild:SetHeight(math.max(FILTER_MENU_ROW_H, nOpts * FILTER_MENU_ROW_H))
     local vis = math.min(11, math.max(1, nOpts))
-    filterMenu:SetHeight(8 + vis * FILTER_MENU_ROW_H)
+    filterMenu:SetHeight(8 + FILTER_MENU_SEARCH_H + 4 + vis * FILTER_MENU_ROW_H)
     local maxO = math.max(0, mChild:GetHeight() - mScroll:GetHeight())
     local cur = mScroll:GetVerticalScroll() or 0
     if cur > maxO then
@@ -417,12 +490,25 @@ function CEF.UI.createMainUI()
     mScroll:SetVerticalScroll(cur)
   end
 
+  mSearchEdit:SetScript("OnTextChanged", function(self)
+    local t = self:GetText() or ""
+    t = t:gsub("^%s+", ""):gsub("%s+$", "")
+    filterMenuSearchQ = strlower(t)
+    updateFilterMenuSearchPh()
+    refreshFilterMenuList()
+    mScroll:SetVerticalScroll(0)
+  end)
+  updateFilterMenuSearchPh()
+
   dropBtn:SetScript("OnClick", function()
     if filterMenu:IsShown() then
       CEF.UIFilters.hideFilterInstanceMenu(f)
     else
       CEF.UIFilters.hideFilterIntentMenu(f)
       CEF.UIFilters.hideFilterRoleMenu(f)
+      filterMenuSearchQ = ""
+      mSearchEdit:SetText("")
+      updateFilterMenuSearchPh()
       refreshFilterMenuList()
       mScroll:SetVerticalScroll(0)
       filterMenu:Show()
@@ -888,9 +974,37 @@ function CEF.UI.createMainUI()
   local LIST_SCROLLBAR_GAP = 18
   local RIGHT_EDGE_INSET = 2
   local RIGHT_SCROLL_OUTSET = RIGHT_EDGE_INSET + LIST_SCROLLBAR_GAP
+
+  -- Footer com contagem (mesmo padrão do Oficial / Guilda).
+  local LIST_FOOTER_H = 22
+  local LIST_BOTTOM_PAD = 4
+  local listFooter = CreateFrame("Frame", nil, f)
+  listFooter:SetHeight(LIST_FOOTER_H)
+  listFooter:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, LIST_BOTTOM_PAD)
+  listFooter:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -RIGHT_SCROLL_OUTSET, LIST_BOTTOM_PAD)
+  listFooter:Hide()
+  local listFootBg = listFooter:CreateTexture(nil, "BACKGROUND")
+  listFootBg:SetAllPoints()
+  listFootBg:SetColorTexture(0.07, 0.065, 0.08, 0.97)
+  local listFootFs = listFooter:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  listFootFs:SetPoint("LEFT", listFooter, "LEFT", 12, 0)
+  listFootFs:SetPoint("RIGHT", listFooter, "RIGHT", -12, 0)
+  listFootFs:SetJustifyH("LEFT")
+  listFootFs:SetText((CEF.L and CEF.L("LFG_RESULT_COUNT", 0)) or "0")
+  f.listFooter = listFooter
+  f.listFooterLabel = listFootFs
+  CEF.UI.listFooterLabel = listFootFs
+
   scrollFrame = CreateFrame("ScrollFrame", nil, f)
   scrollFrame:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -4)
-  scrollFrame:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -RIGHT_SCROLL_OUTSET, 8)
+  -- Âncora no frame principal (não no footer) para o layout não colapsar com Show/Hide.
+  scrollFrame:SetPoint(
+    "BOTTOMRIGHT",
+    f,
+    "BOTTOMRIGHT",
+    -RIGHT_SCROLL_OUTSET,
+    LIST_BOTTOM_PAD + LIST_FOOTER_H + 4
+  )
   scrollFrame:EnableMouse(true)
   CEF.UI.scrollFrame = scrollFrame
 
@@ -1081,6 +1195,49 @@ function CEF.UI.createMainUI()
   f.cefLocaleDropFS = localeDropFS
   f.cefLocaleLabel = localeLabel
 
+  -- Toggle: imprimir novas listagens do Chat no chat do jogo.
+  local alertRow = CreateFrame("Button", nil, settingsTopPanel)
+  alertRow:SetHeight(22)
+  local alertBg = alertRow:CreateTexture(nil, "BACKGROUND")
+  alertBg:SetAllPoints()
+  alertBg:SetColorTexture(0.11, 0.09, 0.07, 0.95)
+  alertRow.bg = alertBg
+  if CEF.UIFilters and CEF.UIFilters.attachFilterRowCheck then
+    CEF.UIFilters.attachFilterRowCheck(alertRow)
+  end
+  local alertFs = alertRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  if alertRow.check then
+    alertFs:SetPoint("LEFT", alertRow.check, "RIGHT", 8, 0)
+  else
+    alertFs:SetPoint("LEFT", alertRow, "LEFT", 8, 0)
+  end
+  alertFs:SetPoint("RIGHT", alertRow, "RIGHT", -8, 0)
+  alertFs:SetJustifyH("LEFT")
+  alertFs:SetText(CEF.L.SETTINGS_CHAT_LISTING_ALERTS or "Print new Chat listings to the game chat")
+  f.cefChatAlertRow = alertRow
+  f.cefChatAlertFs = alertFs
+  local function syncChatAlertCheck()
+    local on = CEF.isChatListingAlertsEnabled and CEF.isChatListingAlertsEnabled()
+    if CEF.UIFilters and CEF.UIFilters.setFilterRowChecked then
+      CEF.UIFilters.setFilterRowChecked(alertRow, on, true)
+    end
+  end
+  alertRow:SetScript("OnClick", function()
+    local on = not (CEF.isChatListingAlertsEnabled and CEF.isChatListingAlertsEnabled())
+    if CEF.setChatListingAlertsEnabled then
+      CEF.setChatListingAlertsEnabled(on)
+    end
+    syncChatAlertCheck()
+  end)
+  alertRow:SetScript("OnEnter", function(self)
+    self.bg:SetColorTexture(0.2, 0.16, 0.11, 1)
+  end)
+  alertRow:SetScript("OnLeave", function(self)
+    self.bg:SetColorTexture(0.11, 0.09, 0.07, 0.95)
+  end)
+  syncChatAlertCheck()
+  f.cefSyncChatAlertCheck = syncChatAlertCheck
+
   local localeMenu = CreateFrame("Frame", nil, f)
   localeMenu:SetWidth(220)
   localeMenu:SetFrameStrata("TOOLTIP")
@@ -1216,7 +1373,13 @@ function CEF.UI.createMainUI()
     y = y + localeLabel:GetStringHeight() + 6
     localeDropBtn:ClearAllPoints()
     localeDropBtn:SetPoint("TOPLEFT", settingsTopPanel, "TOPLEFT", TERMS_H_PAD, -y)
-    y = y + SEARCH_EDIT_H + 14
+    y = y + SEARCH_EDIT_H + 10
+    if alertRow then
+      alertRow:ClearAllPoints()
+      alertRow:SetPoint("TOPLEFT", settingsTopPanel, "TOPLEFT", TERMS_H_PAD, -y)
+      alertRow:SetWidth(math.min(520, math.max(220, w)))
+      y = y + 22 + 14
+    end
     stpAboutTitle:ClearAllPoints()
     stpAboutTitle:SetPoint("TOPLEFT", settingsTopPanel, "TOPLEFT", TERMS_H_PAD, -y)
     y = y + stpAboutTitle:GetStringHeight() + 8
@@ -1536,13 +1699,36 @@ function CEF.UI.createMainUI()
     local instCat = CEF.getInstanceDetectionCatalog()
     local grouped = CEF.getInstanceDetectionRowsGroupedSorted()
 
-    pushCategoryBanner(CEF.L.CATEGORY_DUNGEONS, "CATEGORY_DUNGEONS")
-    for _, row in ipairs(grouped.dungeons) do
-      pushInstanceRow(row, false, 1)
-    end
-    pushCategoryBanner(CEF.L.CATEGORY_RAIDS, "CATEGORY_RAIDS")
-    for _, row in ipairs(grouped.raids) do
-      pushInstanceRow(row, true, 1)
+    if grouped.splitTbc then
+      pushCategoryBanner(CEF.L.CATEGORY_CLASSIC_DUNGEONS or CEF.L.CATEGORY_DUNGEONS, "CATEGORY_CLASSIC_DUNGEONS")
+      for _, row in ipairs(grouped.classicDungeons or {}) do
+        pushInstanceRow(row, false, 1)
+      end
+      pushCategoryBanner(CEF.L.CATEGORY_CLASSIC_RAIDS or CEF.L.CATEGORY_RAIDS, "CATEGORY_CLASSIC_RAIDS")
+      for _, row in ipairs(grouped.classicRaids or {}) do
+        pushInstanceRow(row, true, 1)
+      end
+      pushCategoryBanner(CEF.L.CATEGORY_TBC_DUNGEONS or CEF.L.CATEGORY_DUNGEONS, "CATEGORY_TBC_DUNGEONS")
+      for _, row in ipairs(grouped.tbcDungeons or {}) do
+        pushInstanceRow(row, false, 1)
+      end
+      pushCategoryBanner(CEF.L.CATEGORY_TBC_HEROIC_DUNGEONS or "TBC Heroic Dungeons", "CATEGORY_TBC_HEROIC_DUNGEONS")
+      for _, row in ipairs(grouped.tbcHeroicDungeons or {}) do
+        pushInstanceRow(row, false, 1)
+      end
+      pushCategoryBanner(CEF.L.CATEGORY_TBC_RAIDS or CEF.L.CATEGORY_RAIDS, "CATEGORY_TBC_RAIDS")
+      for _, row in ipairs(grouped.tbcRaids or {}) do
+        pushInstanceRow(row, true, 1)
+      end
+    else
+      pushCategoryBanner(CEF.L.CATEGORY_DUNGEONS, "CATEGORY_DUNGEONS")
+      for _, row in ipairs(grouped.dungeons) do
+        pushInstanceRow(row, false, 1)
+      end
+      pushCategoryBanner(CEF.L.CATEGORY_RAIDS, "CATEGORY_RAIDS")
+      for _, row in ipairs(grouped.raids) do
+        pushInstanceRow(row, true, 1)
+      end
     end
 
     pushSpacer12()
@@ -1706,6 +1892,7 @@ function CEF.UI.createMainUI()
   navBar:SetFrameLevel(240)
   filterBar:SetFrameLevel(240)
   header:SetFrameLevel(50)
+  listFooter:SetFrameLevel(240)
   scrollFrame:SetFrameLevel(50)
   settingsTopPanel:SetFrameLevel(55)
   settingsTermsTableHeader:SetFrameLevel(50)
@@ -1832,6 +2019,9 @@ function CEF.UI.createMainUI()
     filterBar:SetShown(isList)
     header:SetShown(isList)
     scrollFrame:SetShown(isList)
+    if f.listFooter then
+      f.listFooter:SetShown(isList)
+    end
 
     if f.lfgRoot then
       f.lfgRoot:SetShown(isLfg)
@@ -1884,12 +2074,25 @@ function CEF.UI.createMainUI()
         end
       end)
     elseif isLfg then
-      if CEF.LFG and CEF.LFG.search then
-        -- Busca automática ao abrir a aba (gesto do clique na tab).
-        CEF.LFG.search()
-      end
-      if CEF.LFGUI and CEF.LFGUI.refresh then
-        CEF.LFGUI.refresh()
+      -- Adia busca/refresh 1 frame: evita congelar o clique da tab no mesmo tick.
+      if f.lfgRoot then
+        f.lfgRoot:SetScript("OnUpdate", function(self)
+          self:SetScript("OnUpdate", nil)
+          if not f:IsShown() or f.cefNavTab ~= "lfg" then
+            return
+          end
+          if CEF.LFG and CEF.LFG.search then
+            CEF.LFG.search(nil, { force = true })
+          end
+          if CEF.LFGUI and CEF.LFGUI.refresh then
+            CEF.LFGUI.refresh()
+          end
+        end)
+      elseif CEF.LFG and CEF.LFG.search then
+        CEF.LFG.search(nil, { force = true })
+        if CEF.LFGUI and CEF.LFGUI.refresh then
+          CEF.LFGUI.refresh()
+        end
       end
     elseif isGuild then
       if CEF.Guild then
@@ -2331,6 +2534,9 @@ function CEF.UI.createMainUI()
       CEF.LFGUI.refreshLocale(f)
     end
     searchPlaceholder:SetText(CEF.L.SEARCH_PLACEHOLDER_LIST)
+    if f.filterInstanceSearchPlaceholder then
+      f.filterInstanceSearchPlaceholder:SetText(CEF.L.FILTER_INSTANCE_SEARCH or "Search instance…")
+    end
     resetFs:SetText(CEF.L.RESET)
     header.h1:SetText(CEF.L.COL_INSTANCE_LEVELS)
     header.h3:SetText(CEF.L.COL_MESSAGE)
@@ -2345,6 +2551,12 @@ function CEF.UI.createMainUI()
     end
     if localeDropFS then
       localeDropFS:SetText(CEF.Locale.chooserSummaryText())
+    end
+    if f.cefChatAlertFs then
+      f.cefChatAlertFs:SetText(CEF.L.SETTINGS_CHAT_LISTING_ALERTS or "Print new Chat listings to the game chat")
+    end
+    if f.cefSyncChatAlertCheck then
+      f.cefSyncChatAlertCheck()
     end
     stpAboutTitle:SetText(CEF.L.TERMS_ABOUT_TITLE)
     stpAboutBody:SetText(CEF.L.TERMS_ABOUT_BODY)
