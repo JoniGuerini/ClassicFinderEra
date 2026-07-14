@@ -232,6 +232,23 @@ local PROFESSION_TRADE_EXCLUDE = {
   "summon to ",
 }
 
+-- Broadcasts de morte Hardcore / sistema (citam masmorra + classe do killer → falsos LFG).
+local HARDCORE_DEATH_EXCLUDE = {
+  "has been slain by",
+  "was slain by",
+  "has fallen to",
+  "they were level",
+  "foi morto por",
+  "foi morta por",
+  "foi derrotado por",
+  "foi derrotada por",
+  "a été tué par",
+  "a été tuée par",
+  "wurde getötet von",
+  "ha sido asesinado por",
+  "ha sido asesinada por",
+}
+
 -- lower() do cliente não converte cirílico (Ищу→ищу); faz à mão (UTF-8, 2 bytes).
 local function lowerCyrillic(s)
   if not s:find("\208", 1, true) then
@@ -448,12 +465,25 @@ function CEF.looksLikeProfessionOrTradeRequest(text)
   return false
 end
 
+function CEF.looksLikeHardcoreDeathBroadcast(text)
+  local lower = (text or ""):lower()
+  for _, phrase in ipairs(HARDCORE_DEATH_EXCLUDE) do
+    if lower:find(phrase, 1, true) then
+      return true
+    end
+  end
+  return false
+end
+
 -- Só lista anúncios ligados a masmorra/raid: precisa reconhecer instância e não ser pedido de profissão/craft.
 function CEF.passesInstanceFinderFilter(text)
   if not text or text == "" then
     return false
   end
   if CEF.looksLikeProfessionOrTradeRequest(text) then
+    return false
+  end
+  if CEF.looksLikeHardcoreDeathBroadcast(text) then
     return false
   end
   if CEF.detectInstance(text) == "—" then
@@ -624,6 +654,7 @@ function CEF.getMessageDetectionCatalog()
   return {
     lfgHints = LFG_PLAIN,
     professionTradeExclude = PROFESSION_TRADE_EXCLUDE,
+    hardcoreDeathExclude = HARDCORE_DEATH_EXCLUDE,
   }
 end
 

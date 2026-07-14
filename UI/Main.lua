@@ -6,6 +6,104 @@ local CEF = ClassicEraFinder
 
 CEF.UI = CEF.UI or {}
 
+-- Constantes de layout no topo do módulo (Lua 5.1: máx. 200 locals por função).
+local FILTER_MENU_ROW_H = 22
+-- Classic + TBC normal/heroic/raids + cabeçalhos; precisa de folga.
+local FILTER_MENU_MAX_ROWS = 130
+local INTENT_FILTER_MENU_MAX_ROWS = 8
+local ROLE_FILTER_MENU_MAX_ROWS = 8
+local FILTER_INSTANCE_DROPDOWN_W = 196
+local FILTER_INTENT_DROPDOWN_W = 212
+local FILTER_ROLE_DROPDOWN_W = 168
+local FILTER_RESET_BTN_W = 88
+local SEARCH_EDIT_W = 220
+local SEARCH_EDIT_H = 26
+local FILTER_SEARCH_INSTANCE_GAP = 10
+
+-- Card do toggle “Print Chat listings…”: largura justa ao texto / idioma.
+local function sizeChatAlertRowToText(mainFrame, maxWidth)
+  local row = mainFrame and mainFrame.cefChatAlertRow
+  local fs = mainFrame and mainFrame.cefChatAlertFs
+  if not row or not fs then
+    return
+  end
+  local gap, padR = 8, 8
+  local inset = row.check and (6 + 12 + gap) or 8
+  local maxW = math.max(inset + 40, maxWidth or 200)
+  fs:ClearAllPoints()
+  if row.check then
+    fs:SetPoint("LEFT", row.check, "RIGHT", gap, 0)
+  else
+    fs:SetPoint("LEFT", row, "LEFT", 8, 0)
+  end
+  fs:SetWordWrap(false)
+  fs:SetWidth(0)
+  fs:SetText(CEF.L.SETTINGS_CHAT_LISTING_ALERTS or "Print new Chat listings to the game chat")
+  local want = inset + (fs:GetStringWidth() or 0) + padR
+  if want <= maxW then
+    row:SetHeight(22)
+    row:SetWidth(math.max(want, inset + 24))
+  else
+    local labelW = math.max(40, maxW - inset - padR)
+    fs:SetWordWrap(true)
+    fs:SetWidth(labelW)
+    row:SetWidth(maxW)
+    row:SetHeight(math.max(22, (fs:GetStringHeight() or 12) + 8))
+  end
+end
+
+local function syncChatAlertCheck(mainFrame)
+  local row = mainFrame and mainFrame.cefChatAlertRow
+  if not row then
+    return
+  end
+  local on = CEF.isChatListingAlertsEnabled and CEF.isChatListingAlertsEnabled()
+  if CEF.UIFilters and CEF.UIFilters.setFilterRowChecked then
+    CEF.UIFilters.setFilterRowChecked(row, on, true)
+  end
+end
+
+local function buildChatAlertRow(mainFrame, parent)
+  local row = CreateFrame("Button", nil, parent)
+  row:SetHeight(22)
+  local bg = row:CreateTexture(nil, "BACKGROUND")
+  bg:SetAllPoints()
+  bg:SetColorTexture(0.11, 0.09, 0.07, 0.95)
+  row.bg = bg
+  if CEF.UIFilters and CEF.UIFilters.attachFilterRowCheck then
+    CEF.UIFilters.attachFilterRowCheck(row)
+  end
+  local fs = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  if row.check then
+    fs:SetPoint("LEFT", row.check, "RIGHT", 8, 0)
+  else
+    fs:SetPoint("LEFT", row, "LEFT", 8, 0)
+  end
+  fs:SetJustifyH("LEFT")
+  fs:SetJustifyV("MIDDLE")
+  fs:SetWordWrap(false)
+  fs:SetText(CEF.L.SETTINGS_CHAT_LISTING_ALERTS or "Print new Chat listings to the game chat")
+  mainFrame.cefChatAlertRow = row
+  mainFrame.cefChatAlertFs = fs
+  mainFrame.cefSizeChatAlertRow = sizeChatAlertRowToText
+  mainFrame.cefSyncChatAlertCheck = syncChatAlertCheck
+  row:SetScript("OnClick", function()
+    local on = not (CEF.isChatListingAlertsEnabled and CEF.isChatListingAlertsEnabled())
+    if CEF.setChatListingAlertsEnabled then
+      CEF.setChatListingAlertsEnabled(on)
+    end
+    syncChatAlertCheck(mainFrame)
+  end)
+  row:SetScript("OnEnter", function(self)
+    self.bg:SetColorTexture(0.2, 0.16, 0.11, 1)
+  end)
+  row:SetScript("OnLeave", function(self)
+    self.bg:SetColorTexture(0.11, 0.09, 0.07, 0.95)
+  end)
+  syncChatAlertCheck(mainFrame)
+  return row
+end
+
 function CEF.UI.createMainUI()
   if CEF.UI.mainFrame then
     return CEF.UI.mainFrame
@@ -16,20 +114,6 @@ function CEF.UI.createMainUI()
     CEF.state = CEF.state or {}
     return CEF.state
   end
-
-  -- Dimensões do painel de filtros/dropdowns (mantidas iguais ao código anterior)
-  local FILTER_MENU_ROW_H = 22
-  -- Classic + TBC normal/heroic/raids + cabeçalhos; precisa de folga.
-  local FILTER_MENU_MAX_ROWS = 130
-  local INTENT_FILTER_MENU_MAX_ROWS = 8
-  local ROLE_FILTER_MENU_MAX_ROWS = 8
-  local FILTER_INSTANCE_DROPDOWN_W = 196
-  local FILTER_INTENT_DROPDOWN_W = 212
-  local FILTER_ROLE_DROPDOWN_W = 168
-  local FILTER_RESET_BTN_W = 88
-  local SEARCH_EDIT_W = 220
-  local SEARCH_EDIT_H = 26
-  local FILTER_SEARCH_INSTANCE_GAP = 10
 
   local filterMenuRows = {}
   local intentFilterMenuRows = {}
@@ -1195,48 +1279,8 @@ function CEF.UI.createMainUI()
   f.cefLocaleDropFS = localeDropFS
   f.cefLocaleLabel = localeLabel
 
-  -- Toggle: imprimir novas listagens do Chat no chat do jogo.
-  local alertRow = CreateFrame("Button", nil, settingsTopPanel)
-  alertRow:SetHeight(22)
-  local alertBg = alertRow:CreateTexture(nil, "BACKGROUND")
-  alertBg:SetAllPoints()
-  alertBg:SetColorTexture(0.11, 0.09, 0.07, 0.95)
-  alertRow.bg = alertBg
-  if CEF.UIFilters and CEF.UIFilters.attachFilterRowCheck then
-    CEF.UIFilters.attachFilterRowCheck(alertRow)
-  end
-  local alertFs = alertRow:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  if alertRow.check then
-    alertFs:SetPoint("LEFT", alertRow.check, "RIGHT", 8, 0)
-  else
-    alertFs:SetPoint("LEFT", alertRow, "LEFT", 8, 0)
-  end
-  alertFs:SetPoint("RIGHT", alertRow, "RIGHT", -8, 0)
-  alertFs:SetJustifyH("LEFT")
-  alertFs:SetText(CEF.L.SETTINGS_CHAT_LISTING_ALERTS or "Print new Chat listings to the game chat")
-  f.cefChatAlertRow = alertRow
-  f.cefChatAlertFs = alertFs
-  local function syncChatAlertCheck()
-    local on = CEF.isChatListingAlertsEnabled and CEF.isChatListingAlertsEnabled()
-    if CEF.UIFilters and CEF.UIFilters.setFilterRowChecked then
-      CEF.UIFilters.setFilterRowChecked(alertRow, on, true)
-    end
-  end
-  alertRow:SetScript("OnClick", function()
-    local on = not (CEF.isChatListingAlertsEnabled and CEF.isChatListingAlertsEnabled())
-    if CEF.setChatListingAlertsEnabled then
-      CEF.setChatListingAlertsEnabled(on)
-    end
-    syncChatAlertCheck()
-  end)
-  alertRow:SetScript("OnEnter", function(self)
-    self.bg:SetColorTexture(0.2, 0.16, 0.11, 1)
-  end)
-  alertRow:SetScript("OnLeave", function(self)
-    self.bg:SetColorTexture(0.11, 0.09, 0.07, 0.95)
-  end)
-  syncChatAlertCheck()
-  f.cefSyncChatAlertCheck = syncChatAlertCheck
+  -- Toggle: imprimir novas listagens do Chat no chat do jogo (helpers no topo do módulo).
+  buildChatAlertRow(f, settingsTopPanel)
 
   local localeMenu = CreateFrame("Frame", nil, f)
   localeMenu:SetWidth(220)
@@ -1374,11 +1418,15 @@ function CEF.UI.createMainUI()
     localeDropBtn:ClearAllPoints()
     localeDropBtn:SetPoint("TOPLEFT", settingsTopPanel, "TOPLEFT", TERMS_H_PAD, -y)
     y = y + SEARCH_EDIT_H + 10
-    if alertRow then
-      alertRow:ClearAllPoints()
-      alertRow:SetPoint("TOPLEFT", settingsTopPanel, "TOPLEFT", TERMS_H_PAD, -y)
-      alertRow:SetWidth(math.min(520, math.max(220, w)))
-      y = y + 22 + 14
+    if f.cefChatAlertRow then
+      f.cefChatAlertRow:ClearAllPoints()
+      f.cefChatAlertRow:SetPoint("TOPLEFT", settingsTopPanel, "TOPLEFT", TERMS_H_PAD, -y)
+      if f.cefSizeChatAlertRow then
+        f.cefSizeChatAlertRow(f, w)
+      else
+        f.cefChatAlertRow:SetWidth(math.min(520, math.max(220, w)))
+      end
+      y = y + (f.cefChatAlertRow:GetHeight() or 22) + 14
     end
     stpAboutTitle:ClearAllPoints()
     stpAboutTitle:SetPoint("TOPLEFT", settingsTopPanel, "TOPLEFT", TERMS_H_PAD, -y)
@@ -2556,7 +2604,7 @@ function CEF.UI.createMainUI()
       f.cefChatAlertFs:SetText(CEF.L.SETTINGS_CHAT_LISTING_ALERTS or "Print new Chat listings to the game chat")
     end
     if f.cefSyncChatAlertCheck then
-      f.cefSyncChatAlertCheck()
+      f.cefSyncChatAlertCheck(f)
     end
     stpAboutTitle:SetText(CEF.L.TERMS_ABOUT_TITLE)
     stpAboutBody:SetText(CEF.L.TERMS_ABOUT_BODY)

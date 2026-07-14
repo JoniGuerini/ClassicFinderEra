@@ -55,7 +55,11 @@ function Entries.loadFromDB()
     if type(row) == "table" and row.sender and row.text then
       local txt = tostring(row.text)
       local rowTime = tonumber(row.time) or 0
-      if CEF.passesInstanceFinderFilter(txt) and now - rowTime < ENTRY_MAX_LISTING_AGE_SEC then
+      local ch = tostring(row.channel or ""):lower()
+      local fromDeathChannel = ch:find("hardcoredeaths", 1, true) ~= nil
+      if not fromDeathChannel
+        and CEF.passesInstanceFinderFilter(txt)
+        and now - rowTime < ENTRY_MAX_LISTING_AGE_SEC then
         local instList = CEF.detectInstances(txt)
         if #instList == 0 then
           if type(row.instances) == "table" then

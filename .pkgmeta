@@ -9,4 +9,5 @@ ignore:
   - "*.zip"
   - "**/*.png"
   - "**/*.psd"
-  - "**/*.md"
+  # Keep CHANGELOG.md out of the game zip; CurseForge uses the website changelog.
+  - CHANGELOG.md

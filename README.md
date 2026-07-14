@@ -80,6 +80,22 @@ A ordem de carga fica em `ClassicEraFinder.xml`. Os módulos compartilham o glob
 2. No jogo: `/reload` para aplicar
 3. Branch atual: `main` (estrutura modular em `Core/`, `Locale/`, `Data/`, `Features/`, `UI/`)
 
+### Versão e releases (CurseForge)
+
+- Fonte da verdade: `## Version` em `ClassicEraFinder.toc` (hoje **1.1.1**).
+- Histórico: [`CHANGELOG.md`](CHANGELOG.md) (estilo Keep a Changelog + SemVer).
+- Antes de cada upload no CurseForge:
+  1. Mover itens de `[Unreleased]` para a nova secção `## [X.Y.Z] - YYYY-MM-DD`
+  2. Atualizar `## Version` no `.toc`
+  3. Commit / tag opcional `vX.Y.Z`
+  4. Empacotar e publicar no projeto CurseForge (ID `1609116`)
+
+| Parte | Quando incrementar |
+|-------|-------------------|
+| **PATCH** (`1.1.x`) | Correções, filtros, pequenos ajustes de UI |
+| **MINOR** (`1.x.0`) | Nova aba / feature sem quebrar SavedVariables |
+| **MAJOR** (`x.0.0`) | Mudança incompatível (ex.: reset forçado de DB) |
+
 ## Licença / autor
 
 Projeto **ClassicEraFinder** — uso pessoal / comunidade Classic Era.

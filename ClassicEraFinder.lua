@@ -79,9 +79,20 @@ local function purgeStaleEntries()
   end
 end
 
+-- Canais de broadcast do Hardcore (mortes etc.) — não são LFG.
+local function isIgnoredChatChannel(channelBaseName)
+  if not channelBaseName or channelBaseName == "" then
+    return false
+  end
+  return channelBaseName:lower():find("hardcoredeaths", 1, true) ~= nil
+end
+
 local function onChatChannel(...)
   local text, playerName, _, _, _, _, _, _, channelBaseName, _, _, playerGUID = ...
   if not text or not playerName then
+    return
+  end
+  if isIgnoredChatChannel(channelBaseName) then
     return
   end
   CEF.Entries.upsertEntry(playerName, playerGUID, text, channelBaseName or "")
@@ -377,28 +388,6 @@ SlashCmdList["CLASSICERAFINDER"] = function(msg)
           print("  " .. line)
         end
       end
-    end
-    return
-  end
-  -- Demo da aba Grupo: /cef mockgroup [party|raid|raidfull|clear]
-  local mockCmd, mockArg = msg:match("^%s*(%S+)%s*(%S*)")
-  if mockCmd and strlower(mockCmd) == "mockgroup" then
-    if not (CEF.Group and CEF.Group.applyMock) then
-      return
-    end
-    local scenario = (mockArg and mockArg ~= "") and mockArg or "raid"
-    local used = CEF.Group.applyMock(scenario)
-    if CEF.UI and CEF.UI.mainFrame and CEF.UI.mainFrame.cefApplyNavTab then
-      if not CEF.UI.mainFrame:IsShown() then
-        toggleMainFrame()
-      end
-      CEF.UI.mainFrame.cefApplyNavTab("group")
-    end
-    refreshGroupUI()
-    if used == "clear" then
-      print("|cffffcc66CEF:|r mock do grupo limpo. Use |cff00fff6/cef mockgroup raid|r ou |cff00fff6party|r.")
-    else
-      print("|cffffcc66CEF:|r mock ativo: |cff00fff6" .. tostring(used) .. "|r (" .. #(CEF.Group.getMembers() or {}) .. " membros). |cffaaaaaa/cef mockgroup clear|r para limpar.")
     end
     return
   end
